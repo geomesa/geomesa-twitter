@@ -1,0 +1,127 @@
+package geomesa.example.twitter.collect;
+
+import com.beust.jcommander.Parameter;
+import com.google.common.collect.Lists;
+import com.twitter.hbc.ClientBuilder;
+import com.twitter.hbc.core.Client;
+import com.twitter.hbc.core.Constants;
+import com.twitter.hbc.core.endpoint.Location;
+import com.twitter.hbc.core.endpoint.StatusesFilterEndpoint;
+import com.twitter.hbc.core.processor.StringDelimitedProcessor;
+import com.twitter.hbc.httpclient.auth.Authentication;
+import com.twitter.hbc.httpclient.auth.OAuth1;
+import org.apache.log4j.Logger;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+public class TwitterStreamCollector {
+
+    private static final Logger log = Logger.getLogger(TwitterStreamCollector.class);
+
+    static int QUEUE_SIZE = 50000;
+    static int MAX_TWEETS_PER_FILE = 10000;
+    static double LAT_MIN = 5.499550;
+    static double LAT_MAX = 83.162102;
+    static double LON_MIN = -167.276413;
+    static double LON_MAX = -52.233040;
+
+    static final Location.Coordinate SOUTHWEST_CORNER = new Location.Coordinate(LON_MIN, LAT_MIN);
+    static final Location.Coordinate NORTHEAST_CORNER = new Location.Coordinate(LON_MAX, LAT_MAX);
+
+    static final Location COLLECTION_LOCATION = new Location(SOUTHWEST_CORNER, NORTHEAST_CORNER);
+
+    private final File outputDir;
+    private final String consumerKey;
+    private final String consumerSecret;
+    private final String token;
+    private final String secret;
+
+    public TwitterStreamCollector(File outputDir, String consumerKey, String consumerSecret, String token, String secret) {
+        this.outputDir = outputDir;
+        this.consumerKey = consumerKey;
+        this.consumerSecret = consumerSecret;
+        this.token = token;
+        this.secret = secret;
+    }
+
+    public void collect() throws IOException {
+
+        final BlockingQueue<String> queue = new LinkedBlockingQueue<>(QUEUE_SIZE);
+        final StatusesFilterEndpoint endpoint = new StatusesFilterEndpoint();
+
+        // Set location to collect on
+        endpoint.locations(Lists.newArrayList(COLLECTION_LOCATION));
+
+        // add some track terms with this code:
+        // endpoint.trackTerms(Lists.newArrayList("twitterapi", "#yolo"));
+
+        final Authentication auth = new OAuth1(consumerKey, consumerSecret, token, secret);
+
+        // Create a new BasicClient. By default gzip is enabled.
+        final Client client = new ClientBuilder()
+                .hosts(Constants.STREAM_HOST)
+                .endpoint(endpoint)
+                .authentication(auth)
+                .processor(new StringDelimitedProcessor(queue))
+                .build();
+
+        // Establish a connection
+        client.connect();
+
+        while (!client.isDone()) {
+            writeTweetsToFile(getFileToWrite(), queue);
+        }
+
+        client.stop();
+        log.info("Client stopped, restart needed");
+    }
+
+    private void writeTweetsToFile(File file, final BlockingQueue<String> queue) throws IOException {
+        log.info("Writing tweets to " + file.getName());
+        final BufferedWriter bw = new BufferedWriter(new FileWriter(file.getAbsoluteFile()));
+        try {
+            for (int msgRead = 0; msgRead < MAX_TWEETS_PER_FILE; msgRead++) {
+                try {
+                    final String msg = queue.take();
+                    bw.write(msg);
+                }
+                catch (InterruptedException e){
+                    throw new IOException("Error taking tweets off queue", e);
+                }
+            }
+        }
+        finally{
+            bw.close();
+        }
+    }
+
+    private File getOrCreateDayDir(final Date date){
+        final DateFormat df = new SimpleDateFormat("yyyyMMdd");
+
+        final File dayDir = new File(this.outputDir, df.format(date));
+        if (!dayDir.exists()) {
+            dayDir.mkdir();
+        }
+
+        return dayDir;
+    }
+
+    private File getFileToWrite() throws IOException {
+        final Date now = new Date();
+        final File dayDir = getOrCreateDayDir(now);
+
+        final DateFormat dfd = new SimpleDateFormat("yyyyMMdd-HHmmss");
+        final File file = new File(dayDir, dfd.format(now) + ".txt");
+        file.createNewFile();
+        return file;
+    }
+
+}

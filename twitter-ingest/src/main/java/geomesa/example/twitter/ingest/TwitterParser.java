@@ -68,8 +68,13 @@ public class TwitterParser {
         long noGeo = 0;
         JsonObject obj;
         while( (obj = next(jp, jr, sourceName)) != null) {
-            final SimpleFeature sf = convertToFeature(obj, builder, geoFac, df);
-            if(sf.getDefaultGeometry() != null){
+            SimpleFeature sf = null;
+            try {
+                sf = convertToFeature(obj, builder, geoFac, df);
+            } catch (Exception e) {
+                // parsing error
+            }
+            if(sf != null && sf.getDefaultGeometry() != null){
                 results.add(sf);
                 numGoodTweets += 1;
                 if(numGoodTweets % 10_000 == 0){
@@ -81,7 +86,7 @@ public class TwitterParser {
             }
         }
 
-        log.info("Parsed "+Long.toString(numGoodTweets) +" skipping "+ Long.toString(noGeo) +" with no geo");
+        log.info("Parsed "+Long.toString(numGoodTweets) +" skipping "+ Long.toString(noGeo) +" invalid tweets");
         return results;
     }
 

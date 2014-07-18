@@ -1,5 +1,6 @@
 package geomesa.example.twitter.ingest;
 
+import com.google.common.base.Joiner;
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
@@ -17,8 +18,13 @@ import org.joda.time.format.DateTimeFormatter;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 
+import static geomesa.example.twitter.ingest.TwitterFeatureIngester.*;
+
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Class to parse twitter data from an input stream that has one tweet as json per line
@@ -43,17 +49,21 @@ public class TwitterParser {
 
     final String featureName;
     final SimpleFeatureType twitterType;
+    final boolean useExtendedFeatures;
 
-    public TwitterParser(final String featureName, SimpleFeatureType sft) {
+    public TwitterParser(final String featureName, SimpleFeatureType sft, boolean useExtendedFeatures) {
         this.featureName = featureName;
         this.twitterType =  sft;
+        this.useExtendedFeatures = useExtendedFeatures;
     }
 
     /**
      * Parse an input stream using GSON
      */
     public SimpleFeatureCollection parse(final InputStream is, final String sourceName) throws IOException {
-        log.info("Starting parse of " + sourceName);
+        log.info(sourceName + " - starting parsing");
+
+        final long startTime = System.currentTimeMillis();
 
         final DefaultFeatureCollection results = new DefaultFeatureCollection(featureName, twitterType);
         final Reader bufReader = new BufferedReader(new InputStreamReader(is));
@@ -65,28 +75,28 @@ public class TwitterParser {
         builder.setValidating(true);
 
         long numGoodTweets = 0;
-        long noGeo = 0;
+        long numBadTweets = 0;
         JsonObject obj;
-        while( (obj = next(jp, jr, sourceName)) != null) {
+        while ((obj = next(jp, jr, sourceName)) != null) {
             SimpleFeature sf = null;
             try {
                 sf = convertToFeature(obj, builder, geoFac, df);
             } catch (Exception e) {
                 // parsing error
             }
-            if(sf != null && sf.getDefaultGeometry() != null){
+            if (sf != null && sf.getDefaultGeometry() != null) {
                 results.add(sf);
-                numGoodTweets += 1;
-                if(numGoodTweets % 10_000 == 0){
-                    log.info(Long.toString(numGoodTweets) + " records parsed");
+                numGoodTweets++;
+                if (numGoodTweets % 100_000 == 0) {
+                    log.debug(Long.toString(numGoodTweets) + " records parsed");
                 }
-            }
-            else {
-                noGeo++;
+            } else {
+                numBadTweets++;
             }
         }
-
-        log.info("Parsed "+Long.toString(numGoodTweets) +" skipping "+ Long.toString(noGeo) +" invalid tweets");
+        final long parseTime = System.currentTimeMillis() - startTime;
+        log.info(sourceName + " - parsed " + numGoodTweets +" skipping " + numBadTweets +
+                 " invalid tweets in " + parseTime + "ms");
         return results;
     }
 
@@ -103,8 +113,7 @@ public class TwitterParser {
         builder.set(TwitterFeatureIngester.FEAT_USER_NAME, userName);
         builder.set(TwitterFeatureIngester.FEAT_USER_ID, userId);
 
-        final String text = obj.get(TEXT).getAsString();
-        builder.set(TwitterFeatureIngester.FEAT_TEXT, text);
+        builder.set(TwitterFeatureIngester.FEAT_TEXT, obj.get(TEXT).getAsString());
 
         // geo info
         final boolean hasGeoJson = obj.has(COORDS_GEO_JSON) && obj.get(COORDS_GEO_JSON) != JsonNull.INSTANCE;
@@ -127,7 +136,80 @@ public class TwitterParser {
         builder.set(TwitterFeatureIngester.FEAT_TWEET_ID, tweetId);
         builder.set(TwitterFeatureIngester.FEAT_DTG,date);
 
+        if (useExtendedFeatures) {
+            conditionalSetString(builder, obj, FEAT_IS_RETWEET);
+            conditionalSetString(builder, obj, FEAT_SOURCE);
+            conditionalSetLong(builder, obj, FEAT_RETWEETS);
+            conditionalSetLong(builder, obj, FEAT_IN_REPLY_TO_USER_ID);
+            conditionalSetString(builder, obj, FEAT_IN_REPLY_TO_USER_NAME);
+            conditionalSetString(builder, obj, FEAT_IN_REPLY_TO_STATUS);
+            conditionalSetString(builder, obj, FEAT_FILTER_LEVEL);
+            conditionalSetString(builder, obj, FEAT_LANGUAGE);
+            conditionalSetString(builder, obj, FEAT_WITHHELD_COPYRIGHT);
+            conditionalSetString(builder, obj, FEAT_WITHHELD_SCOPE);
+            conditionalSetArray(builder, obj, FEAT_WITHHELD_COUNTRIES);
+
+            JsonElement entities = obj.get("entities");
+            if (entities != null && entities != JsonNull.INSTANCE) {
+                JsonObject e = (JsonObject) entities;
+                conditionalSetObjectArray(builder, e, FEAT_HASHTAGS, "text");
+                conditionalSetObjectArray(builder, e, FEAT_URLS, "url");
+                conditionalSetObjectArray(builder, e, FEAT_SYMBOLS, "text");
+                conditionalSetObjectArray(builder, e, FEAT_USER_MENTIONS, "id");
+                conditionalSetObjectArray(builder, e, FEAT_MEDIA, "media_url");
+            }
+        }
+
         return builder.buildFeature(Long.toString(tweetId));
+    }
+
+    private void conditionalSetObjectArray(SimpleFeatureBuilder builder,
+                                           JsonObject obj,
+                                           String feature,
+                                           String nestedAttribute) {
+
+        JsonElement object = obj.get(feature);
+        if (object != null && object != JsonNull.INSTANCE) {
+            List<String> values = new ArrayList<>();
+            for (Iterator<JsonElement> iter = ((JsonArray) object).iterator(); iter.hasNext();) {
+                JsonElement next = iter.next();
+                if (next != null && next != JsonNull.INSTANCE) {
+                    JsonElement attribute = ((JsonObject) next).get(nestedAttribute);
+                    if (attribute != null && attribute != JsonNull.INSTANCE) {
+                        values.add(attribute.getAsString());
+                    }
+                }
+            }
+            if (!values.isEmpty()) {
+                builder.set(feature, Joiner.on(",").join(values));
+            }
+        }
+    }
+
+    private void conditionalSetArray(SimpleFeatureBuilder builder, JsonObject obj, String feature) {
+        JsonElement a = obj.get(feature);
+        if (a != null && a != JsonNull.INSTANCE) {
+            for (Iterator<JsonElement> i = ((JsonArray) a).iterator(); i.hasNext(); ) {
+                JsonElement e = i.next();
+                if (e != null && e != JsonNull.INSTANCE) {
+                    builder.set(feature, e.getAsString());
+                }
+            }
+        }
+    }
+
+    private void conditionalSetString(SimpleFeatureBuilder builder, JsonObject obj, String feature) {
+        JsonElement e = obj.get(feature);
+        if (e != null && e != JsonNull.INSTANCE) {
+            builder.set(feature, e.getAsString());
+        }
+    }
+
+    private void conditionalSetLong(SimpleFeatureBuilder builder, JsonObject obj, String feature) {
+        JsonElement e = obj.get(feature);
+        if (e != null && e != JsonNull.INSTANCE) {
+            builder.set(feature, e.getAsLong());
+        }
     }
 
     private JsonObject next(final JsonParser parser, final JsonReader reader, final String sourceName) throws IOException {
@@ -138,7 +220,7 @@ public class TwitterParser {
                     return element.getAsJsonObject();
                 }
             } catch (Exception e) {
-                log.error("Error parsing json from source " + sourceName, e);
+                log.error(sourceName + " - error parsing json", e);
                 return null;
             }
         }

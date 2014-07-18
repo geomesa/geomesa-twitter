@@ -39,8 +39,29 @@ public class Runner {
             System.exit(-1);
         }
 
-        final TwitterFeatureIngester ingester = new TwitterFeatureIngester();
-        ingester.initialize(clArgs.instanceId, clArgs.zookeepers, clArgs.user, clArgs.password, clArgs.tableName, clArgs.featureName);
+        Integer shards = null;
+        if (clArgs.shards != null) {
+            try {
+                shards = Integer.parseInt(clArgs.shards);
+                if (shards < 0) {
+                    log.warn("Invalid parameter for number of shards, using default");
+                    shards = null;
+                }
+            } catch (Exception e) {
+                log.warn("Invalid parameter for number of shards, using default");
+            }
+        }
+
+        final TwitterFeatureIngester ingester = new TwitterFeatureIngester(Boolean.valueOf(clArgs.extendedFeatures));
+
+        ingester.initialize(clArgs.instanceId,
+                            clArgs.zookeepers,
+                            clArgs.user,
+                            clArgs.password,
+                            clArgs.tableName,
+                            clArgs.featureName,
+                            clArgs.indexSchemaFormat,
+                            shards);
 
         log.info("Begining ingest...");
 
@@ -59,6 +80,11 @@ public class Runner {
         @Parameter(names= {"--featureName"}, description = "featureName to assign to the data", required = true)
         String featureName;
 
+        @Parameter(names= {"--useExtendedFeatures"}, description = "parse extended features or the minimal set", required = false)
+        String extendedFeatures;
+
+        @Parameter(names= {"--shards"}, description = "number of shards to use for data", required = false)
+        String shards;
     }
 
     public static class GeomesaArgs{
@@ -77,5 +103,7 @@ public class Runner {
         @Parameter(names = {"--tableName"}, description = "Accumulo table name", required = true)
         String tableName;
 
+        @Parameter(names = {"--indexSchemaFormat"}, description = "Schema for indexing data", required = false)
+        String indexSchemaFormat;
     }
 }

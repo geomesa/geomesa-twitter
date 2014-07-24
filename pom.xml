@@ -22,6 +22,7 @@
         <gt.version>11.0</gt.version>
         <avro.version>1.7.5</avro.version>
         <twitter4j.version>3.0.4</twitter4j.version>
+        <postgresql.jdbc.version>9.1-901-1.jdbc4</postgresql.jdbc.version>
     </properties>
 
     <dependencyManagement>
@@ -91,6 +92,12 @@
                 <groupId>org.geotools</groupId>
                 <artifactId>gt-epsg-hsql</artifactId>
                 <version>${gt.version}</version>
+            </dependency>
+
+            <dependency>
+              <groupId>org.geotools</groupId>
+              <artifactId>gt-cql</artifactId>
+              <version>${gt.version}</version>
             </dependency>
 
             <dependency>
@@ -196,6 +203,13 @@
                 <artifactId>guava</artifactId>
                 <version>11.0.1</version>
             </dependency>
+
+          <dependency>
+            <groupId>postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.jdbc.version}</version>
+          </dependency>
+
         </dependencies>
     </dependencyManagement>
 

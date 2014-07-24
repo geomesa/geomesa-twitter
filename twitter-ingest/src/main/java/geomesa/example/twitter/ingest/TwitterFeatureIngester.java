@@ -1,20 +1,23 @@
 package geomesa.example.twitter.ingest;
 
 import com.google.common.base.Joiner;
-import geomesa.core.data.AccumuloDataStore;
-import geomesa.core.data.AccumuloFeatureStore;
-import geomesa.core.index.Constants;
 import org.apache.log4j.Logger;
+import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.DataUtilities;
+import org.geotools.data.FeatureStore;
 import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.data.simple.SimpleFeatureIterator;
+import org.geotools.feature.DefaultFeatureCollection;
 import org.geotools.feature.SchemaException;
+import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class TwitterFeatureIngester {
@@ -58,7 +61,7 @@ public class TwitterFeatureIngester {
                 FEAT_USER_ID + ":" + "java.lang.Long",
                 FEAT_TEXT + ":" + "String",
                 FEAT_DTG + ":" + "Date",
-                FEAT_GEOM + ":" + "Geometry:srid=4326"
+                FEAT_GEOM + ":" + "Point:srid=4326"
         };
         FEATURE_SPEC = Joiner.on(",").join(features);
 
@@ -87,8 +90,10 @@ public class TwitterFeatureIngester {
     final SimpleFeatureType twitterType;
     final boolean useExtendedFeatures;
 
-    AccumuloFeatureStore source;
+    FeatureStore source;
     TwitterParser parser;
+
+    String featureName;
 
     public TwitterFeatureIngester() {
         this(false);
@@ -101,7 +106,7 @@ public class TwitterFeatureIngester {
         } catch (SchemaException e) {
             throw new IllegalArgumentException("Bad feature spec", e);
         }
-        twitterType.getUserData().put(Constants.SF_PROPERTY_START_TIME, FEAT_DTG);
+        twitterType.getUserData().put("geomesa_index_start_time", FEAT_DTG);
         this.twitterType = twitterType;
         this.useExtendedFeatures = useExtendedFeatures;
     }
@@ -110,37 +115,37 @@ public class TwitterFeatureIngester {
         return twitterType;
     }
 
-    public void initialize(String instanceId, String zookeepers, String user, String password,
-                           String tableName, String featureName, String indexSchema, Integer numShards) throws IOException {
-        final Map<String, String> geomesaParams = new HashMap<>();
-        geomesaParams.put("instanceId", instanceId);
-        geomesaParams.put("zookeepers", zookeepers);
-        geomesaParams.put("user", user);
-        geomesaParams.put("password", password);
-        geomesaParams.put("tableName", tableName);
-        geomesaParams.put("indexSchemaFormat", indexSchema);
+    public void initialize(String featureName, Map<String, Object> dataStoreParams) throws IOException {
+        this.featureName = featureName;
 
+        String indexSchema = (String) dataStoreParams.get("indexSchemaFormat");
         log.info("Getting GeoMesa data store - using schema " + (indexSchema == null ? "DEFAULT" : indexSchema));
-        final AccumuloDataStore ds;
+        final DataStore ds;
         try {
-            ds = (AccumuloDataStore) DataStoreFinder.getDataStore(geomesaParams);
+            ds = DataStoreFinder.getDataStore(dataStoreParams);
+            if (ds == null) {
+                throw new IOException("No data store returned");
+            }
         } catch (IOException e) {
             throw new IOException("Error creating Geomesa datastore ", e);
         }
 
-        log.info("Creating Geomesa tables...");
-        long startTime = System.currentTimeMillis();
-        if (numShards == null) {
-            ds.createSchema(getSchema());
-        } else {
-            log.info("Using " + numShards + " shards");
-            ds.createSchema(getSchema(), numShards);
+        try {
+            ds.getSchema(twitterType.getTypeName());
+            log.info("Geomesa tables exist...");
+        } catch (IOException e) {
+            // schema doesn't exist, create it
+            log.info("Creating Geomesa tables...");
+            long startTime = System.currentTimeMillis();
+
+            ds.createSchema(twitterType);
+
+            long createTime = System.currentTimeMillis() - startTime;
+            log.info("Created schema in " + createTime + "ms");
         }
-        long createTime = System.currentTimeMillis() - startTime;
-        log.info("Created schema in " + createTime + "ms");
 
         try {
-           this.source = (AccumuloFeatureStore) ds.getFeatureSource(getSchema().getName());
+           this.source = (FeatureStore) ds.getFeatureSource(getSchema().getName());
         } catch (IOException e) {
             throw new IOException("Error creating Geomesa feature store ", e);
         }
@@ -157,9 +162,9 @@ public class TwitterFeatureIngester {
             throw new IllegalStateException("Initialize ingester before using");
         }
 
-        log.info("Begining ingest of file "+file.getName());
+        log.info("Beginning ingest of file "+file.getName());
 
-        SimpleFeatureCollection results;
+        List<SimpleFeatureCollection> results;
 
         final FileInputStream fis = new FileInputStream(file);
         try {
@@ -168,12 +173,34 @@ public class TwitterFeatureIngester {
             fis.close();
         }
 
-        if(results != null && results.size() > 0) {
+        if (results != null && !results.isEmpty()) {
             final long startTime = System.currentTimeMillis();
-            log.info(file.getName() + " - beginning insertion of parsed records into accumulo");
-            source.addFeatures(results);
+            log.info(file.getName() + " - beginning insertion of parsed records into data store");
+            long count = 0;
+            long errors = 0;
+            for (SimpleFeatureCollection collection : results) {
+                try {
+                    source.addFeatures(collection);
+                    count += collection.size();
+                } catch (IOException e) {
+                    // try each one
+                    for(SimpleFeatureIterator iter = collection.features();iter.hasNext(); ) {
+                        DefaultFeatureCollection c = new DefaultFeatureCollection(featureName, twitterType);
+                        c.add(iter.next());
+                        try {
+                            source.addFeatures(c);
+                            count++;
+                        } catch (IOException e2) {
+                            log.error("Error inserting feature: " + e2.toString());
+                            log.debug("Bad feature: " + c.features().next());
+                            errors++;
+                        }
+                    }
+                }
+            }
             final long insertTime = System.currentTimeMillis() - startTime;
-            log.info(file.getName() + " - added " + results.size() + " features in " + insertTime + "ms");
+            log.info(file.getName() + " - added " + count + " features and failed " +
+                     errors + "in " + insertTime + "ms");
         } else {
             log.info(file.getName() + " - no features ingested");
         }

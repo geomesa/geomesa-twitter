@@ -9,7 +9,9 @@ import org.apache.log4j.Logger;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Run the ingest...should be a shaded jar installed to ~/.m2/repository
@@ -26,44 +28,32 @@ public class Runner {
 
         BasicConfigurator.configure();
         Logger.getRootLogger().setLevel(Level.INFO);
+        Logger.getLogger("geomesa.example").setLevel(Level.DEBUG);
 
         //parse args
         final MyArgs clArgs = new MyArgs();
         final JCommander jc = new JCommander(clArgs);
-        try{
+        try {
             jc.parse(args);
-        }
-        catch (ParameterException e){
+        } catch (ParameterException e) {
             log.info("Error parsing arguments: " + e.getMessage());
             jc.usage();
             System.exit(-1);
         }
 
-        Integer shards = null;
-        if (clArgs.shards != null) {
-            try {
-                shards = Integer.parseInt(clArgs.shards);
-                if (shards < 0) {
-                    log.warn("Invalid parameter for number of shards, using default");
-                    shards = null;
-                }
-            } catch (Exception e) {
-                log.warn("Invalid parameter for number of shards, using default");
-            }
-        }
-
         final TwitterFeatureIngester ingester = new TwitterFeatureIngester(Boolean.valueOf(clArgs.extendedFeatures));
 
-        ingester.initialize(clArgs.instanceId,
-                            clArgs.zookeepers,
-                            clArgs.user,
-                            clArgs.password,
-                            clArgs.tableName,
-                            clArgs.featureName,
-                            clArgs.indexSchemaFormat,
-                            shards);
+        final Map<String, Object> params = new HashMap<>();
+        params.put("instanceId", clArgs.instanceId);
+        params.put("zookeepers", clArgs.zookeepers);
+        params.put("user", clArgs.user);
+        params.put("password", clArgs.password);
+        params.put("tableName", clArgs.tableName);
+        params.put("indexSchemaFormat", clArgs.indexSchemaFormat);
 
-        log.info("Begining ingest...");
+        ingester.initialize(clArgs.featureName, params);
+
+        log.info("Beginning ingest...");
 
         for(final String fileName: clArgs.files) {
             final File file = new File(fileName);

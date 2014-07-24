@@ -42,6 +42,8 @@ public class TwitterParser {
     public static final String CREATED_AT = "created_at";
     public static final String TEXT = "text";
 
+    public static final int BATCH_SIZE = 10_000;
+
     final GeometryFactory geoFac = new GeometryFactory();
 
     //Mon May 19 01:42:26 +0000 2014
@@ -60,12 +62,12 @@ public class TwitterParser {
     /**
      * Parse an input stream using GSON
      */
-    public SimpleFeatureCollection parse(final InputStream is, final String sourceName) throws IOException {
+    public List<SimpleFeatureCollection> parse(final InputStream is, final String sourceName) throws IOException {
         log.info(sourceName + " - starting parsing");
 
         final long startTime = System.currentTimeMillis();
 
-        final DefaultFeatureCollection results = new DefaultFeatureCollection(featureName, twitterType);
+        final List<SimpleFeatureCollection> results = new ArrayList<>();
         final Reader bufReader = new BufferedReader(new InputStreamReader(is));
         final JsonReader jr = new JsonReader(bufReader);
         jr.setLenient(true);
@@ -73,6 +75,8 @@ public class TwitterParser {
 
         final SimpleFeatureBuilder builder = new SimpleFeatureBuilder(twitterType);
         builder.setValidating(true);
+
+        DefaultFeatureCollection batch = new DefaultFeatureCollection(featureName, twitterType);
 
         long numGoodTweets = 0;
         long numBadTweets = 0;
@@ -85,14 +89,22 @@ public class TwitterParser {
                 // parsing error
             }
             if (sf != null && sf.getDefaultGeometry() != null) {
-                results.add(sf);
+                batch.add(sf);
                 numGoodTweets++;
+                if (numGoodTweets % BATCH_SIZE == 0) {
+                    results.add(batch);
+                    batch = new DefaultFeatureCollection(featureName, twitterType);
+                }
                 if (numGoodTweets % 100_000 == 0) {
                     log.debug(Long.toString(numGoodTweets) + " records parsed");
                 }
             } else {
                 numBadTweets++;
             }
+        }
+        // add remaining results
+        if (!batch.isEmpty()) {
+            results.add(batch);
         }
         final long parseTime = System.currentTimeMillis() - startTime;
         log.info(sourceName + " - parsed " + numGoodTweets +" skipping " + numBadTweets +
@@ -110,10 +122,10 @@ public class TwitterParser {
         final JsonObject user = obj.getAsJsonObject(USER);
         final String userName = user.getAsJsonPrimitive(USER_NAME).getAsString();
         long userId = user.getAsJsonPrimitive(USER_ID).getAsLong();
-        builder.set(TwitterFeatureIngester.FEAT_USER_NAME, userName);
+        builder.set(TwitterFeatureIngester.FEAT_USER_NAME, utf8(userName));
         builder.set(TwitterFeatureIngester.FEAT_USER_ID, userId);
 
-        builder.set(TwitterFeatureIngester.FEAT_TEXT, obj.get(TEXT).getAsString());
+        builder.set(TwitterFeatureIngester.FEAT_TEXT, utf8(obj.get(TEXT).getAsString()));
 
         // geo info
         final boolean hasGeoJson = obj.has(COORDS_GEO_JSON) && obj.get(COORDS_GEO_JSON) != JsonNull.INSTANCE;
@@ -123,7 +135,7 @@ public class TwitterParser {
             double lat = coords.get(0).getAsDouble();
             double lon = coords.get(1).getAsDouble();
 
-            if(lon !=  0.0 && lat != 0.0) {
+            if (lon !=  0.0 && lat != 0.0) {
                 final Coordinate coordinate = new Coordinate(lat, lon);
                 final Geometry g = new Point(new CoordinateArraySequence(new Coordinate[]{coordinate}), factory);
                 builder.set(TwitterFeatureIngester.FEAT_GEOM, g);
@@ -134,7 +146,7 @@ public class TwitterParser {
         final long tweetId = obj.get(TWEET_ID).getAsLong();
         final Date date = df.parseDateTime(obj.get(CREATED_AT).getAsString()).toDate();
         builder.set(TwitterFeatureIngester.FEAT_TWEET_ID, tweetId);
-        builder.set(TwitterFeatureIngester.FEAT_DTG,date);
+        builder.set(TwitterFeatureIngester.FEAT_DTG, date);
 
         if (useExtendedFeatures) {
             conditionalSetString(builder, obj, FEAT_IS_RETWEET);
@@ -161,6 +173,10 @@ public class TwitterParser {
         }
 
         return builder.buildFeature(Long.toString(tweetId));
+    }
+
+    private String utf8(String input) {
+        return input == null ? null : input.replaceAll("\\p{C}", "?");
     }
 
     private void conditionalSetObjectArray(SimpleFeatureBuilder builder,

@@ -96,18 +96,19 @@ public class TwitterFeatureIngester {
     String featureName;
 
     public TwitterFeatureIngester() {
-        this(false);
+        this("twitter", false);
     }
 
-    public TwitterFeatureIngester(boolean useExtendedFeatures) {
+    public TwitterFeatureIngester(String featureName, boolean useExtendedFeatures) {
         final SimpleFeatureType twitterType;
         try {
-            twitterType = DataUtilities.createType("twitter", useExtendedFeatures ? EXTENDED_FEATURE_SPEC : FEATURE_SPEC);
+            twitterType = DataUtilities.createType(featureName, useExtendedFeatures ? EXTENDED_FEATURE_SPEC : FEATURE_SPEC);
         } catch (SchemaException e) {
             throw new IllegalArgumentException("Bad feature spec", e);
         }
         twitterType.getUserData().put("geomesa_index_start_time", FEAT_DTG);
         this.twitterType = twitterType;
+        this.featureName = featureName;
         this.useExtendedFeatures = useExtendedFeatures;
     }
 
@@ -115,9 +116,7 @@ public class TwitterFeatureIngester {
         return twitterType;
     }
 
-    public void initialize(String featureName, Map<String, Object> dataStoreParams) throws IOException {
-        this.featureName = featureName;
-
+    public void initialize(Map<String, Object> dataStoreParams) throws IOException {
         String indexSchema = (String) dataStoreParams.get("indexSchemaFormat");
         log.info("Getting GeoMesa data store - using schema " + (indexSchema == null ? "DEFAULT" : indexSchema));
         final DataStore ds;

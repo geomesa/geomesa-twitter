@@ -41,7 +41,7 @@ public class Runner {
             System.exit(-1);
         }
 
-        final TwitterFeatureIngester ingester = new TwitterFeatureIngester(Boolean.valueOf(clArgs.extendedFeatures));
+        final TwitterFeatureIngester ingester = new TwitterFeatureIngester(clArgs.featureName, Boolean.valueOf(clArgs.extendedFeatures));
 
         final Map<String, Object> params = new HashMap<>();
         params.put("instanceId", clArgs.instanceId);
@@ -51,7 +51,7 @@ public class Runner {
         params.put("tableName", clArgs.tableName);
         params.put("indexSchemaFormat", clArgs.indexSchemaFormat);
 
-        ingester.initialize(clArgs.featureName, params);
+        ingester.initialize(params);
 
         log.info("Beginning ingest...");
 

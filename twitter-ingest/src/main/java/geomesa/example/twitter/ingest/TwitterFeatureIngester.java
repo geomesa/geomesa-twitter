@@ -129,10 +129,7 @@ public class TwitterFeatureIngester {
             throw new IOException("Error creating Geomesa datastore ", e);
         }
 
-        try {
-            ds.getSchema(twitterType.getTypeName());
-            log.info("Geomesa tables exist...");
-        } catch (IOException e) {
+        if(ds.getSchema(twitterType.getTypeName()) == null) {
             // schema doesn't exist, create it
             log.info("Creating Geomesa tables...");
             long startTime = System.currentTimeMillis();
@@ -141,6 +138,8 @@ public class TwitterFeatureIngester {
 
             long createTime = System.currentTimeMillis() - startTime;
             log.info("Created schema in " + createTime + "ms");
+        } else {
+            log.info("Geomesa tables exist...");
         }
 
         try {

@@ -67,30 +67,30 @@ public class Runner {
         @Parameter(description = "files", required = true)
         List<String> files = new ArrayList<>();
 
-        @Parameter(names= {"--featureName"}, description = "featureName to assign to the data", required = true)
+        @Parameter(names= {"--featureName", "-f"}, description = "featureName to assign to the data", required = true)
         String featureName;
 
         @Parameter(names= {"--useExtendedFeatures"}, description = "parse extended features or the minimal set", required = false)
         String extendedFeatures;
 
-        @Parameter(names= {"--shards"}, description = "number of shards to use for data", required = false)
+        @Parameter(names= {"--shards", "-s"}, description = "number of shards to use for data", required = false)
         String shards;
     }
 
     public static class GeomesaArgs{
-        @Parameter(names = {"--instanceId"}, description = "Name of the Accumulo Instance", required = true)
+        @Parameter(names = {"--instanceId", "-i"}, description = "Name of the Accumulo Instance", required = true)
         String instanceId;
 
-        @Parameter(names = {"--zookeepers"}, description = "Comma separated list of zookeepers", required = true)
+        @Parameter(names = {"--zookeepers", "-z"}, description = "Comma separated list of zookeepers", required = true)
         String zookeepers;
 
-        @Parameter(names = {"--user"}, description = "Accumulo user name", required = true)
+        @Parameter(names = {"--user", "-u"}, description = "Accumulo user name", required = true)
         String user;
 
-        @Parameter(names = {"--password"}, description = "Accumulo password", required = true)
+        @Parameter(names = {"--password", "-p"}, description = "Accumulo password", required = true)
         String password;
 
-        @Parameter(names = {"--tableName"}, description = "Accumulo table name", required = true)
+        @Parameter(names = {"--tableName", "-t"}, description = "Accumulo table name", required = true)
         String tableName;
 
         @Parameter(names = {"--indexSchemaFormat"}, description = "Schema for indexing data", required = false)

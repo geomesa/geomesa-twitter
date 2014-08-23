@@ -22,15 +22,15 @@ cd geomesa-twitter
 mvn clean install
 ```
 
-## Collected Twitter Dat
-Sign up for twitter and get developer keys
+## Collected Twitter Data
+Sign up for twitter and get developer keys...more info coming soon
 
 ## Ingesting Twitter into GeoMesa
 
 Run the ingest jar to see a list of arguments for ingest:
 
 ```
-ahulbert@doubletrouble:~/IdeaProjects/geomesa-twitter-tutorial$ java -jar twitter-ingest/target/twitter-ingest-accumulo1.5-1.0-SNAPSHOT.jar 
+$> java -jar twitter-ingest/target/twitter-ingest-accumulo1.5-1.0-SNAPSHOT.jar 
 0 [main] INFO geomesa.example.twitter.ingest.Runner  - Error parsing arguments: The following options are required: --instanceId, -i --zookeepers, -z --tableName, -t --password, -p --user, -u --featureName, -f 
 Usage: <main class> [options] files
   Options:

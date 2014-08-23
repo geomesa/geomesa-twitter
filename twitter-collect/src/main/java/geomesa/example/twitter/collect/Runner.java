@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 Commonwealth Computer Research, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package geomesa.example.twitter.collect;
 
 import com.beust.jcommander.JCommander;
@@ -13,10 +29,11 @@ public class Runner {
     private static final Logger log = Logger.getLogger(Runner.class);
 
     public static void main(String[] args) throws Exception {
+        // configure log4j
         BasicConfigurator.configure();
         Logger.getRootLogger().setLevel(Level.INFO);
 
-        //parse args
+        // parse args
         final MyArgs clArgs = new MyArgs();
         final JCommander jc = new JCommander(clArgs);
         try {
@@ -38,6 +55,7 @@ public class Runner {
             outputDir.mkdirs();
         }
 
+        // collect tweets
         final TwitterStreamCollector collector = new TwitterStreamCollector(
                 outputDir,
                 clArgs.consumerKey,
@@ -49,19 +67,19 @@ public class Runner {
     }
 
     static class MyArgs {
-        @Parameter(names = {"--consumerKey"}, description = "Twitter consumer key", required = true)
+        @Parameter(names = {"--consumerKey", "-ck"}, description = "Twitter consumer key", required = true)
         String consumerKey;
 
-        @Parameter(names = {"--consumerSecret"}, description = "Twitter consumer secret", required = true)
+        @Parameter(names = {"--consumerSecret", "-cs"}, description = "Twitter consumer secret", required = true)
         String consumerSecret;
 
-        @Parameter(names = {"--token"}, description = "Twitter token", required = true)
+        @Parameter(names = {"--token", "-t"}, description = "Twitter token", required = true)
         String token;
 
-        @Parameter(names = {"--secret"}, description = "Twitter secret", required = true)
+        @Parameter(names = {"--secret", "-s"}, description = "Twitter secret", required = true)
         String secret;
 
-        @Parameter(names = {"--outputDir"}, description = "Output Directory", required = true)
+        @Parameter(names = {"--outputDir", "-o"}, description = "Output Directory", required = true)
         String outputDir;
     }
 }

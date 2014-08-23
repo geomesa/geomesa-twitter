@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 Commonwealth Computer Research, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package geomesa.example.twitter.spark
 
 import java.text.SimpleDateFormat
@@ -29,9 +45,9 @@ object Runner {
 
     val ds = DataStoreFinder.getDataStore(params).asInstanceOf[AccumuloDataStore]
 
-    // Construct a CQL query to filter by bounding box
+    // Construct a CQL query to filter by bounding box (set bbox based on data we collected)
     val ff = CommonFactoryFinder.getFilterFactory2
-    val f = ff.bbox("geom",  -90.32023,38.72009,-90.23957,38.77019, "EPSG:4326")
+    val f = ff.bbox("geom", -90.32023, 38.72009, -90.23957, 38.77019, "EPSG:4326")
     val q = new Query(feature, f)
 
     // Configure Spark

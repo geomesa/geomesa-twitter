@@ -21,10 +21,10 @@ object Runner {
 
     // Get a handle to the data store
     val params = Map(
-      "instanceId" -> "dcloud",
-      "zookeepers" -> "dzoo1,dzoo2,dzoo3",
-      "user"       -> "root",
-      "password"   -> "secret",
+      "instanceId" -> "myinstance",
+      "zookeepers" -> "zoo1,zoo2,zoo3",
+      "user"       -> "user",
+      "password"   -> "password",
       "tableName"  -> "geomesa_catalog")
 
     val ds = DataStoreFinder.getDataStore(params).asInstanceOf[AccumuloDataStore]

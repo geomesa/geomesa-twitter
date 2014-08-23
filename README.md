@@ -1,5 +1,3 @@
-<p align="center"><a href="http://geomesa.github.io"><img src="https://raw.githubusercontent.com/geomesa/geomesa.github.io/master/img/geomesa-2x.png"></img></a></p>
-
 ## GeoMesa Twitter
 
 GeoMesa Twitter provides three example projects to collect, ingest, and analyze Twitter data in GeoMesa.

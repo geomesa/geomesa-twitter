@@ -12,10 +12,12 @@
     <modules>
         <module>twitter-ingest</module>
         <module>twitter-collect</module>
+        <module>twitter-spark</module>
     </modules>
 
     <properties>
         <!-- environment-dependent versions -->
+        <scala.version>2.10.4</scala.version>
         <zookeeper.version>3.3.6</zookeeper.version>
         <accumulo.version>1.5.1</accumulo.version>
         <hadoop.version>2.2.0</hadoop.version>
@@ -27,7 +29,26 @@
 
     <dependencyManagement>
         <dependencies>
-
+            <dependency>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>scala-library</artifactId>
+                <version>${scala.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>scala-compiler</artifactId>
+                <version>${scala.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>jline</artifactId>
+                <version>${scala.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>scala-reflect</artifactId>
+                <version>${scala.version}</version>
+            </dependency>
             <dependency>
                 <groupId>com.twitter</groupId>
                 <artifactId>hbc-core</artifactId>
@@ -67,6 +88,12 @@
             <dependency>
                 <groupId>org.locationtech.geomesa</groupId>
                 <artifactId>geomesa-core-accumulo1.5</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.locationtech.geomesa</groupId>
+                <artifactId>geomesa-compute-accumulo1.5</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
 

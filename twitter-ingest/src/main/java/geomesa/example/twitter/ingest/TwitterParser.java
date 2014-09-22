@@ -31,6 +31,7 @@ import org.geotools.feature.DefaultFeatureCollection;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.locationtech.geomesa.feature.AvroSimpleFeatureFactory;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 
@@ -89,7 +90,7 @@ public class TwitterParser {
         jr.setLenient(true);
         final JsonParser jp = new JsonParser();
 
-        final SimpleFeatureBuilder builder = new SimpleFeatureBuilder(twitterType);
+        final SimpleFeatureBuilder builder = AvroSimpleFeatureFactory.featureBuilder(twitterType);
         builder.setValidating(true);
 
         DefaultFeatureCollection batch = new DefaultFeatureCollection(featureName, twitterType);

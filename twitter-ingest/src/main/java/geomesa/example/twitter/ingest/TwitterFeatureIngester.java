@@ -26,6 +26,7 @@ import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.feature.DefaultFeatureCollection;
 import org.geotools.feature.SchemaException;
+import org.locationtech.geomesa.utils.geotools.SimpleFeatureTypes;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 
@@ -72,9 +73,9 @@ public class TwitterFeatureIngester {
 
     static {
         final String[] features = {
-                FEAT_TWEET_ID + ":" + "java.lang.Long",
-                FEAT_USER_NAME + ":" + "String",
-                FEAT_USER_ID + ":" + "java.lang.Long",
+                FEAT_TWEET_ID + ":" + "Long:index=true",
+                FEAT_USER_NAME + ":" + "String:index=true",
+                FEAT_USER_ID + ":" + "Long:index=true",
                 FEAT_TEXT + ":" + "String",
                 FEAT_DTG + ":" + "Date",
                 FEAT_GEOM + ":" + "Point:srid=4326"
@@ -117,11 +118,7 @@ public class TwitterFeatureIngester {
 
     public TwitterFeatureIngester(String featureName, boolean useExtendedFeatures) {
         final SimpleFeatureType twitterType;
-        try {
-            twitterType = DataUtilities.createType(featureName, useExtendedFeatures ? EXTENDED_FEATURE_SPEC : FEATURE_SPEC);
-        } catch (SchemaException e) {
-            throw new IllegalArgumentException("Bad feature spec", e);
-        }
+        twitterType = SimpleFeatureTypes.createType(featureName, useExtendedFeatures ? EXTENDED_FEATURE_SPEC : FEATURE_SPEC);
         twitterType.getUserData().put("geomesa_index_start_time", FEAT_DTG);
         this.twitterType = twitterType;
         this.featureName = featureName;

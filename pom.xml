@@ -23,8 +23,10 @@
         <hadoop.version>2.2.0</hadoop.version>
         <gt.version>11.0</gt.version>
         <avro.version>1.7.5</avro.version>
-        <twitter4j.version>3.0.4</twitter4j.version>
+        <twitter4j.version>4.0.1</twitter4j.version>
+        <hbc.version>2.2.0</hbc.version>
         <postgresql.jdbc.version>9.1-901-1.jdbc4</postgresql.jdbc.version>
+        <geomesa.version>1.0.0-rc.3-SNAPSHOT</geomesa.version>
     </properties>
 
     <dependencyManagement>
@@ -52,13 +54,13 @@
             <dependency>
                 <groupId>com.twitter</groupId>
                 <artifactId>hbc-core</artifactId>
-                <version>1.4.0</version>
+                <version>${hbc.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>com.twitter</groupId>
                 <artifactId>hbc-twitter4j</artifactId>
-                <version>1.4.0</version>
+                <version>${hbc.version}</version>
             </dependency>
 
             <dependency>
@@ -88,13 +90,13 @@
             <dependency>
                 <groupId>org.locationtech.geomesa</groupId>
                 <artifactId>geomesa-core-accumulo1.5</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
+                <version>${geomesa.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>org.locationtech.geomesa</groupId>
                 <artifactId>geomesa-compute-accumulo1.5</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
+                <version>${geomesa.version}</version>
             </dependency>
 
             <dependency>
@@ -241,7 +243,6 @@
     </dependencyManagement>
 
     <build>
-
         <pluginManagement>
             <plugins>
                 <plugin>

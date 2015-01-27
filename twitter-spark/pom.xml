@@ -129,6 +129,20 @@
           <artifactId>scala-reflect</artifactId>
       </dependency>
 
+      <dependency>
+          <groupId>org.apache.spark</groupId>
+          <artifactId>spark-core_2.10</artifactId>
+          <version>1.1.0</version>
+          <scope>provided</scope>
+          <exclusions>
+              <exclusion>
+                  <!-- excluded due to license issues -->
+                  <artifactId>objenesis</artifactId>
+                  <groupId>org.objenesis</groupId>
+              </exclusion>
+          </exclusions>
+      </dependency>
+
   </dependencies>
 
   <build>

@@ -48,15 +48,10 @@ public class TwitterStreamCollector {
     static int MAX_TWEETS_PER_FILE = 10000;
 
     // Set a bbox on a spot of interest for twitter analysis
-//    static double LAT_MIN = 38.72009;
-//    static double LAT_MAX = 38.77019;
-//    static double LON_MIN = -90.32023;
-//    static double LON_MAX = -90.23957;
-
-    static double LAT_MIN = 38.6;
-    static double LAT_MAX = 38.8;
-    static double LON_MIN = -76.8;
-    static double LON_MAX = -77.2;
+    static double LAT_MIN = 38.72009;
+    static double LAT_MAX = 38.77019;
+    static double LON_MIN = -90.32023;
+    static double LON_MAX = -90.23957;
 
     static final Location.Coordinate SOUTHWEST_CORNER = new Location.Coordinate(LON_MIN, LAT_MIN);
     static final Location.Coordinate NORTHEAST_CORNER = new Location.Coordinate(LON_MAX, LAT_MAX);
@@ -107,39 +102,6 @@ public class TwitterStreamCollector {
 
         client.stop();
         log.info("Client stopped, restart needed");
-    }
-
-    public void collect2() throws IOException {
-        /** Set up your blocking queues: Be sure to size these properly based on expected TPS of your stream */
-        BlockingQueue<String> msgQueue = new LinkedBlockingQueue<String>(100000);
-        BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<Event>(1000);
-
-        /** Declare the host you want to connect to, the endpoint, and authentication (basic auth or oauth) */
-        Hosts hosebirdHosts = new HttpHosts(Constants.STREAM_HOST);
-        StatusesFilterEndpoint hosebirdEndpoint = new StatusesFilterEndpoint();
-
-        hosebirdEndpoint.locations(Lists.newArrayList(COLLECTION_LOCATION));
-
-        // auth
-        final Authentication auth = new OAuth1(consumerKey, consumerSecret, token, secret);
-
-        ClientBuilder builder = new ClientBuilder()
-                .hosts(hosebirdHosts)
-                .authentication(auth)
-                .endpoint(hosebirdEndpoint)
-                .processor(new StringDelimitedProcessor(msgQueue));
-
-        Client hosebirdClient = builder.build();
-
-        // Attempts to establish a connection.
-        hosebirdClient.connect();
-
-        // on a different thread, or multiple different threads....
-        while (!hosebirdClient.isDone()) {
-            writeTweetsToFile(getFileToWrite(), msgQueue);
-        }
-
-        hosebirdClient.stop();
     }
 
     private void writeTweetsToFile(File file, final BlockingQueue<String> queue) throws IOException {

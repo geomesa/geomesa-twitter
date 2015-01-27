@@ -63,7 +63,7 @@ public class Runner {
                 clArgs.token,
                 clArgs.secret);
 
-        collector.collect();
+        collector.collect2();
     }
 
     static class MyArgs {

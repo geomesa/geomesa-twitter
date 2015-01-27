@@ -21,7 +21,7 @@
         <zookeeper.version>3.3.6</zookeeper.version>
         <accumulo.version>1.5.1</accumulo.version>
         <hadoop.version>2.2.0</hadoop.version>
-        <gt.version>11.0</gt.version>
+        <gt.version>11.2</gt.version>
         <avro.version>1.7.5</avro.version>
         <twitter4j.version>4.0.1</twitter4j.version>
         <hbc.version>2.2.0</hbc.version>
@@ -230,7 +230,7 @@
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>11.0.1</version>
+                <version>14.0.1</version>
             </dependency>
 
           <dependency>

@@ -66,15 +66,24 @@ public class TwitterParser {
     //Mon May 19 01:42:26 +0000 2014
     final DateTimeFormatter df = DateTimeFormat.forPattern("EEE MMM dd HH:mm:ss Z yyyy");
 
-    final String featureName;
-    final SimpleFeatureType twitterType;
-    final boolean useExtendedFeatures;
+    private final String featureName;
+    private final SimpleFeatureType twitterType;
+    private final boolean useExtendedFeatures;
+
+    private final JsonParser jsonParser;
+    private final SimpleFeatureBuilder builder;
 
     public TwitterParser(final String featureName, SimpleFeatureType sft, boolean useExtendedFeatures) {
         this.featureName = featureName;
         this.twitterType =  sft;
         this.useExtendedFeatures = useExtendedFeatures;
+
+        this.jsonParser = new JsonParser();
+        this.builder = AvroSimpleFeatureFactory.featureBuilder(twitterType);
+        builder.setValidating(true);
     }
+
+
 
     /**
      * Parse an input stream using GSON
@@ -88,17 +97,13 @@ public class TwitterParser {
         final Reader bufReader = new BufferedReader(new InputStreamReader(is));
         final JsonReader jr = new JsonReader(bufReader);
         jr.setLenient(true);
-        final JsonParser jp = new JsonParser();
-
-        final SimpleFeatureBuilder builder = AvroSimpleFeatureFactory.featureBuilder(twitterType);
-        builder.setValidating(true);
 
         DefaultFeatureCollection batch = new DefaultFeatureCollection(featureName, twitterType);
 
         long numGoodTweets = 0;
         long numBadTweets = 0;
         JsonObject obj;
-        while ((obj = next(jp, jr, sourceName)) != null) {
+        while ((obj = next(jsonParser, jr, sourceName)) != null) {
             SimpleFeature sf = null;
             try {
                 sf = convertToFeature(obj, builder, geoFac, df);
@@ -127,6 +132,20 @@ public class TwitterParser {
         log.info(sourceName + " - parsed " + numGoodTweets +" skipping " + numBadTweets +
                  " invalid tweets in " + parseTime + "ms");
         return results;
+    }
+
+    public SimpleFeature parse(String input) {
+        try {
+            final JsonElement element = jsonParser.parse(input);
+            if (element != null && element != JsonNull.INSTANCE) {
+                final JsonObject jsonObject = element.getAsJsonObject();
+                return convertToFeature(jsonObject, this.builder, geoFac, df);
+            }
+        } catch (Exception e) {
+            log.error("error parsing input: "+ input, e);
+            return null;
+        }
+        return null;
     }
 
     private SimpleFeature convertToFeature(final JsonObject obj,

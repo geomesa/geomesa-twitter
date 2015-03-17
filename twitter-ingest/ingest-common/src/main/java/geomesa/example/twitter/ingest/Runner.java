@@ -34,7 +34,7 @@ import java.util.Map;
  *
  * Last arg is files and you can use the * syntax in bash shell to pass multiple files
  *
- * java -jar twitter-ingest-1.0-SNAPSHOT.jar --instanceId instance --user root --password secret --zookeepers 'zoo1,zoo2,zoo3' --tableName twitter_tutorial  --featureName twitter_tutorial file1.txt file2.txt file3.txt
+ * java -jar twitter-ingest-1.0-SNAPSHOT.jar --instanceId instance --user root --password secret --zookeepers 'zoo1,zoo2,zoo3' --catalog twitter_tutorial  --featureName twitter_tutorial file1.txt file2.txt file3.txt
  */
 public class Runner {
 
@@ -47,7 +47,7 @@ public class Runner {
         Logger.getLogger("geomesa.example").setLevel(Level.DEBUG);
 
         //parse args
-        final MyArgs clArgs = new MyArgs();
+        final IngestArgs clArgs = new IngestArgs();
         final JCommander jc = new JCommander(clArgs);
         try {
             jc.parse(args);
@@ -64,7 +64,7 @@ public class Runner {
         params.put("zookeepers", clArgs.zookeepers);
         params.put("user", clArgs.user);
         params.put("password", clArgs.password);
-        params.put("tableName", clArgs.tableName);
+        params.put("tableName", clArgs.catalog);
         params.put("indexSchemaFormat", clArgs.indexSchemaFormat);
 
         ingester.initialize(params);
@@ -79,37 +79,37 @@ public class Runner {
         log.info("Ingest completed");
     }
 
-    static class MyArgs extends GeomesaArgs {
+    public static class IngestArgs extends GeomesaArgs {
         @Parameter(description = "files", required = true)
-        List<String> files = new ArrayList<>();
+        public List<String> files = new ArrayList<>();
 
         @Parameter(names= {"--featureName", "-f"}, description = "featureName to assign to the data", required = true)
-        String featureName;
+        public String featureName;
 
         @Parameter(names= {"--useExtendedFeatures", "-e"}, description = "parse extended features or the minimal set", required = false)
-        String extendedFeatures;
+        public String extendedFeatures;
 
         @Parameter(names= {"--shards", "-s"}, description = "number of shards to use for data", required = false)
-        String shards;
+        public String shards;
     }
 
     public static class GeomesaArgs{
         @Parameter(names = {"--instanceId", "-i"}, description = "Name of the Accumulo Instance", required = true)
-        String instanceId;
+        public String instanceId;
 
         @Parameter(names = {"--zookeepers", "-z"}, description = "Comma separated list of zookeepers", required = true)
-        String zookeepers;
+        public String zookeepers;
 
         @Parameter(names = {"--user", "-u"}, description = "Accumulo user name", required = true)
-        String user;
+        public String user;
 
         @Parameter(names = {"--password", "-p"}, description = "Accumulo password", required = true)
-        String password;
+        public String password;
 
-        @Parameter(names = {"--tableName", "-t"}, description = "Accumulo table name", required = true)
-        String tableName;
+        @Parameter(names = {"--catalog", "-c"}, description = "Accumulo catalog table name", required = true)
+        public String catalog;
 
         @Parameter(names = {"--indexSchemaFormat"}, description = "Schema for indexing data", required = false)
-        String indexSchemaFormat;
+        public String indexSchemaFormat;
     }
 }

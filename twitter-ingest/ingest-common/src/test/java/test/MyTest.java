@@ -32,7 +32,7 @@
 //        geomesaParams.put("zookeepers", "dzoo1,dzoo2,dzoo3");
 //        geomesaParams.put("user", "root");
 //        geomesaParams.put("password", "secret");
-//        geomesaParams.put("tableName", "andrew_twitter2");
+//        geomesaParams.put("catalog", "andrew_twitter2");
 //
 //        AccumuloDataStore ds = (AccumuloDataStore) DataStoreFinder.getDataStore(geomesaParams);
 //        ds.createSchema(type);

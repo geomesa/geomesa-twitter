@@ -22,8 +22,8 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.{SparkConf, SparkContext}
 import org.geotools.data.{Query, DataStoreFinder}
 import org.geotools.factory.CommonFactoryFinder
+import org.locationtech.geomesa.accumulo.data.AccumuloDataStore
 import org.locationtech.geomesa.compute.spark.GeoMesaSpark
-import org.locationtech.geomesa.core.data.AccumuloDataStore
 
 object Runner {
   def main(args: Array[String]) {
@@ -37,11 +37,11 @@ object Runner {
 
     // Get a handle to the data store
     val params = Map(
-      "instanceId" -> "myinstance",
-      "zookeepers" -> "zoo1,zoo2,zoo3",
-      "user"       -> "user",
-      "password"   -> "password",
-      "tableName"  -> "geomesa_catalog")
+      "instanceId" -> "dcloud",
+      "zookeepers" -> "dzoo1,dzoo2,dzoo3",
+      "user"       -> "root",
+      "password"   -> "secret",
+      "tableName"  -> "twitter_rc5")
 
     val ds = DataStoreFinder.getDataStore(params).asInstanceOf[AccumuloDataStore]
 
@@ -56,7 +56,7 @@ object Runner {
     val sc = new SparkContext(sconf)
 
     // Create an RDD from a query
-    val queryRDD = org.locationtech.geomesa.compute.spark.GeoMesaSpark.rdd(conf, sc, ds, q)
+    val queryRDD = org.locationtech.geomesa.compute.spark.GeoMesaSpark.rdd(conf, sc, params, q)
 
     // Convert RDD[SimpleFeature] to RDD[(String, SimpleFeature)] where the first
     // element of the tuple is the date to the day resolution
@@ -64,11 +64,11 @@ object Runner {
       val df = new SimpleDateFormat("yyyyMMdd")
       val ff = CommonFactoryFinder.getFilterFactory2
       val exp = ff.property("dtg")
-      iter.map { f => (df.format(exp.evaluate(f).asInstanceOf[java.util.Date]), f) }
+      iter.map { f => (df.format(exp.evaluate(f).asInstanceOf[java.util.Date]), 1) }
     }
 
     // Group the results by day
-    val groupedByDay = dayAndFeature.groupBy { case (date, _) => date }
+    val groupedByDay = dayAndFeature.groupBy { case (date, count) => date }
 
     // Count the number of features in each day
     val countByDay = groupedByDay.map { case (date, iter) => (date, iter.size) }

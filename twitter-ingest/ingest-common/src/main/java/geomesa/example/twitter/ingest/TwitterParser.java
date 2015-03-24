@@ -31,17 +31,17 @@ import org.geotools.feature.DefaultFeatureCollection;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-import org.locationtech.geomesa.feature.AvroSimpleFeatureFactory;
+import org.locationtech.geomesa.features.ScalaSimpleFeatureFactory;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
-
-import static geomesa.example.twitter.ingest.TwitterFeatureIngester.*;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+
+import static geomesa.example.twitter.ingest.TwitterFeatureIngester.*;
 
 /**
  * Class to parse twitter data from an input stream that has one tweet as json per line
@@ -77,13 +77,12 @@ public class TwitterParser {
         this.featureName = featureName;
         this.twitterType =  sft;
         this.useExtendedFeatures = useExtendedFeatures;
+        if (this.useExtendedFeatures) log.info("Using extended feature schema");
 
         this.jsonParser = new JsonParser();
-        this.builder = AvroSimpleFeatureFactory.featureBuilder(twitterType);
+        this.builder = ScalaSimpleFeatureFactory.featureBuilder(twitterType);
         builder.setValidating(true);
     }
-
-
 
     /**
      * Parse an input stream using GSON
@@ -143,9 +142,22 @@ public class TwitterParser {
             }
         } catch (Exception e) {
             log.error("error parsing input: "+ input, e);
-            return null;
         }
         return null;
+    }
+
+    public boolean parse(String input, SimpleFeature toWrite) {
+        try {
+            final JsonElement element = jsonParser.parse(input);
+            if (element != null && element != JsonNull.INSTANCE) {
+                final JsonObject jsonObject = element.getAsJsonObject();
+                fillFeature(jsonObject, toWrite, geoFac, df);
+                return true;
+            }
+        } catch (Exception e) {
+            log.error("error parsing input: "+ input, e);
+        }
+        return false;
     }
 
     private SimpleFeature convertToFeature(final JsonObject obj,
@@ -157,7 +169,7 @@ public class TwitterParser {
         // user info
         final JsonObject user = obj.getAsJsonObject(USER);
         final String userName = user.getAsJsonPrimitive(USER_NAME).getAsString();
-        long userId = user.getAsJsonPrimitive(USER_ID).getAsLong();
+        final String userId = user.getAsJsonPrimitive(USER_ID).getAsString();
         builder.set(TwitterFeatureIngester.FEAT_USER_NAME, utf8(userName));
         builder.set(TwitterFeatureIngester.FEAT_USER_ID, userId);
 
@@ -179,7 +191,7 @@ public class TwitterParser {
         }
 
         // time and id
-        final long tweetId = obj.get(TWEET_ID).getAsLong();
+        final String tweetId = obj.get(TWEET_ID).getAsString();
         final Date date = df.parseDateTime(obj.get(CREATED_AT).getAsString()).toDate();
         builder.set(TwitterFeatureIngester.FEAT_TWEET_ID, tweetId);
         builder.set(TwitterFeatureIngester.FEAT_DTG, date);
@@ -187,8 +199,8 @@ public class TwitterParser {
         if (useExtendedFeatures) {
             conditionalSetString(builder, obj, FEAT_IS_RETWEET);
             conditionalSetString(builder, obj, FEAT_SOURCE);
-            conditionalSetLong(builder, obj, FEAT_RETWEETS);
-            conditionalSetLong(builder, obj, FEAT_IN_REPLY_TO_USER_ID);
+            conditionalSetString(builder, obj, FEAT_RETWEETS);
+            conditionalSetString(builder, obj, FEAT_IN_REPLY_TO_USER_ID);
             conditionalSetString(builder, obj, FEAT_IN_REPLY_TO_USER_NAME);
             conditionalSetString(builder, obj, FEAT_IN_REPLY_TO_STATUS);
             conditionalSetString(builder, obj, FEAT_FILTER_LEVEL);
@@ -208,7 +220,70 @@ public class TwitterParser {
             }
         }
 
-        return builder.buildFeature(Long.toString(tweetId));
+        return builder.buildFeature(tweetId);
+    }
+
+    private void fillFeature(final JsonObject obj,
+                             final SimpleFeature sf,
+                             final GeometryFactory factory,
+                             final DateTimeFormatter df) {
+
+        // user info
+        final JsonObject user = obj.getAsJsonObject(USER);
+        final String userName = user.getAsJsonPrimitive(USER_NAME).getAsString();
+        final String userId = user.getAsJsonPrimitive(USER_ID).getAsString();
+        sf.setAttribute(TwitterFeatureIngester.FEAT_USER_NAME, utf8(userName));
+        sf.setAttribute(TwitterFeatureIngester.FEAT_USER_ID, userId);
+
+        sf.setAttribute(TwitterFeatureIngester.FEAT_TEXT, utf8(obj.get(TEXT).getAsString()));
+
+        // geo info
+        final boolean hasGeoJson = obj.has(COORDS_GEO_JSON) && obj.get(COORDS_GEO_JSON) != JsonNull.INSTANCE;
+        if (hasGeoJson) {
+            final JsonObject geo = obj.getAsJsonObject(COORDS_GEO_JSON);
+            final JsonArray coords = geo.getAsJsonArray(COORDS);
+            double lat = coords.get(0).getAsDouble();
+            double lon = coords.get(1).getAsDouble();
+
+            if (lon !=  0.0 && lat != 0.0) {
+                final Coordinate coordinate = new Coordinate(lat, lon);
+                final Geometry g = new Point(new CoordinateArraySequence(new Coordinate[]{coordinate}), factory);
+                sf.setAttribute(TwitterFeatureIngester.FEAT_GEOM, g);
+            }
+        }
+
+        // time and id
+        final String tweetId = obj.get(TWEET_ID).getAsString();
+        final Date date = df.parseDateTime(obj.get(CREATED_AT).getAsString()).toDate();
+        sf.setAttribute(TwitterFeatureIngester.FEAT_TWEET_ID, tweetId);
+        sf.setAttribute(TwitterFeatureIngester.FEAT_DTG, date);
+
+        if (useExtendedFeatures) {
+            conditionalSetString(sf, obj, FEAT_IS_RETWEET);
+            conditionalSetString(sf, obj, FEAT_SOURCE);
+            conditionalSetString(sf, obj, FEAT_RETWEETS);
+            conditionalSetString(sf, obj, FEAT_IN_REPLY_TO_USER_ID);
+            conditionalSetString(sf, obj, FEAT_IN_REPLY_TO_USER_NAME);
+            conditionalSetString(sf, obj, FEAT_IN_REPLY_TO_STATUS);
+            conditionalSetString(sf, obj, FEAT_FILTER_LEVEL);
+            conditionalSetString(sf, obj, FEAT_LANGUAGE);
+            conditionalSetString(sf, obj, FEAT_WITHHELD_COPYRIGHT);
+            conditionalSetString(sf, obj, FEAT_WITHHELD_SCOPE);
+            conditionalSetArray(sf, obj, FEAT_WITHHELD_COUNTRIES);
+
+            JsonElement entities = obj.get("entities");
+            if (entities != null && entities != JsonNull.INSTANCE) {
+                JsonObject e = (JsonObject) entities;
+                conditionalSetObjectArray(sf, e, FEAT_HASHTAGS, "text");
+                conditionalSetObjectArray(sf, e, FEAT_URLS, "url");
+                conditionalSetObjectArray(sf, e, FEAT_SYMBOLS, "text");
+                conditionalSetObjectArray(sf, e, FEAT_USER_MENTIONS, "id");
+                conditionalSetObjectArray(sf, e, FEAT_MEDIA, "media_url");
+            }
+        }
+
+        //((FeatureIdImpl)sf.getIdentifier()).setID(Long.toString(tweetId));
+        //sf.getUserData().put(Hints.USE_PROVIDED_FID, Boolean.TRUE);
     }
 
     private String utf8(String input) {
@@ -219,7 +294,6 @@ public class TwitterParser {
                                            JsonObject obj,
                                            String feature,
                                            String nestedAttribute) {
-
         JsonElement object = obj.get(feature);
         if (object != null && object != JsonNull.INSTANCE) {
             List<String> values = new ArrayList<>();
@@ -257,10 +331,47 @@ public class TwitterParser {
         }
     }
 
-    private void conditionalSetLong(SimpleFeatureBuilder builder, JsonObject obj, String feature) {
+    //
+    // Simple Feature Methods
+    //
+    private void conditionalSetObjectArray(SimpleFeature sf,
+                                           JsonObject obj,
+                                           String feature,
+                                           String nestedAttribute) {
+
+        JsonElement object = obj.get(feature);
+        if (object != null && object != JsonNull.INSTANCE) {
+            List<String> values = new ArrayList<>();
+            for (Iterator<JsonElement> iter = ((JsonArray) object).iterator(); iter.hasNext();) {
+                JsonElement next = iter.next();
+                if (next != null && next != JsonNull.INSTANCE) {
+                    JsonElement attribute = ((JsonObject) next).get(nestedAttribute);
+                    if (attribute != null && attribute != JsonNull.INSTANCE) {
+                        values.add(attribute.getAsString());
+                    }
+                }
+            }
+            if (!values.isEmpty()) {
+                sf.setAttribute(feature, Joiner.on(",").join(values));
+            }
+        }
+    }
+
+    private void conditionalSetArray(SimpleFeature sf, JsonObject obj, String feature) {
+        JsonElement a = obj.get(feature);
+        if (a != null && a != JsonNull.INSTANCE) {
+            for (Iterator<JsonElement> i = ((JsonArray) a).iterator(); i.hasNext(); ) {
+                JsonElement e = i.next();
+                if (e != null && e != JsonNull.INSTANCE) {
+                    sf.setAttribute(feature, e.getAsString());
+                }
+            }
+        }
+    }
+    private void conditionalSetString(SimpleFeature sf, JsonObject obj, String feature) {
         JsonElement e = obj.get(feature);
         if (e != null && e != JsonNull.INSTANCE) {
-            builder.set(feature, e.getAsLong());
+            sf.setAttribute(feature, e.getAsString());
         }
     }
 

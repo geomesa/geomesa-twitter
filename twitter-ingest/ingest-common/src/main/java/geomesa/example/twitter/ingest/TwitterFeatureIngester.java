@@ -70,12 +70,13 @@ public class TwitterFeatureIngester {
 
     public static final String FEATURE_SPEC;
     public static final String EXTENDED_FEATURE_SPEC;
+    public static final String SPEC3;
 
     static {
         final String[] features = {
-                FEAT_TWEET_ID + ":" + "Long:index=true",
+                FEAT_TWEET_ID + ":" + "String",
                 FEAT_USER_NAME + ":" + "String:index=true",
-                FEAT_USER_ID + ":" + "Long:index=true",
+                FEAT_USER_ID + ":" + "String:index=true",
                 FEAT_TEXT + ":" + "String",
                 FEAT_DTG + ":" + "Date",
                 FEAT_GEOM + ":" + "Point:srid=4326"
@@ -102,6 +103,27 @@ public class TwitterFeatureIngester {
                 FEAT_LANGUAGE + ":" + "String"
         };
         EXTENDED_FEATURE_SPEC = Joiner.on(",").join(extendedFeatures);
+
+        final String[] spec3features = {
+                FEATURE_SPEC,
+                FEAT_IN_REPLY_TO_USER_ID + ":" + "java.lang.Long",
+                FEAT_IN_REPLY_TO_USER_NAME + ":" + "String",
+                FEAT_IN_REPLY_TO_STATUS + ":" + "String",
+                FEAT_HASHTAGS + ":" + "List[String]",
+                FEAT_USER_MENTIONS + ":" + "String",
+                FEAT_URLS + ":" + "String",
+                FEAT_SYMBOLS + ":" + "String",
+                FEAT_MEDIA + ":" + "String",
+                FEAT_RETWEETS + ":" + "java.lang.Long",
+                FEAT_IS_RETWEET + ":" + "String",
+                FEAT_SOURCE + ":" + "String",
+                FEAT_FILTER_LEVEL + ":" + "String",
+                FEAT_WITHHELD_COPYRIGHT + ":" + "String",
+                FEAT_WITHHELD_COUNTRIES + ":" + "String",
+                FEAT_WITHHELD_SCOPE + ":" + "String",
+                FEAT_LANGUAGE + ":" + "String"
+        };
+        SPEC3 = Joiner.on(",").join(spec3features);
     }
 
     final SimpleFeatureType twitterType;

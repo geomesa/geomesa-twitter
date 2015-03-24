@@ -1,6 +1,7 @@
 package geomesa.example.twitter.ingest.mapreduce;
 
 import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
 import com.beust.jcommander.ParameterException;
 import com.google.common.base.Joiner;
 import geomesa.example.twitter.ingest.Runner;
@@ -22,7 +23,7 @@ import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureWriter;
 import org.geotools.data.Transaction;
-import org.geotools.filter.identity.FeatureIdImpl;
+import org.locationtech.geomesa.accumulo.data.AccumuloDataStore;
 import org.locationtech.geomesa.utils.geotools.SimpleFeatureTypes;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
@@ -48,7 +49,7 @@ public class TwitterIngest extends Configured implements Tool {
     public static final String FEATURE = PRE + "featurename";
     public static final String SFT = PRE + "sft";
     public static final String EXTENDED_FEATURES = PRE + "extendedFeatures";
-    public static final String INDEX_SCHEMA_FORMAT = PRE + "idxSchemaFormat";
+    public static final String PARSE_ONLY = PRE + "parseonly";
 
     @Override
     public int run(String[] args) throws Exception {
@@ -66,6 +67,7 @@ public class TwitterIngest extends Configured implements Tool {
         // Test the sft to make sure it works
         final String sftString = Boolean.valueOf(jca.extendedFeatures)
                 ? TwitterFeatureIngester.EXTENDED_FEATURE_SPEC : TwitterFeatureIngester.FEATURE_SPEC;
+        final String augmented = sftString + ";table.splitter.class=org.locationtech.geomesa.core.data.DigitSplitter,table.splitter.options=fmt:%01d,min:0,max:9";
         final SimpleFeatureType sft = SimpleFeatureTypes.createType(jca.featureName, sftString);
 
         // Create the datastore
@@ -76,9 +78,9 @@ public class TwitterIngest extends Configured implements Tool {
         dataStoreParams.put("password", jca.password);
         dataStoreParams.put("tableName", jca.catalog);
 
-        final DataStore ds;
+        final AccumuloDataStore ds;
         try {
-            ds = DataStoreFinder.getDataStore(dataStoreParams);
+            ds = (AccumuloDataStore)DataStoreFinder.getDataStore(dataStoreParams);
             if (ds == null) {
                 throw new IOException("No data store returned");
             }
@@ -91,7 +93,13 @@ public class TwitterIngest extends Configured implements Tool {
             logger.info("Creating Geomesa tables...");
             long startTime = System.currentTimeMillis();
 
-            ds.createSchema(sft);
+            if (jca.shards != null) {
+                int shards = Integer.parseInt(jca.shards);
+                ds.createSchema(sft);
+                logger.info("Created schema with custom max shards: " + Integer.toString(shards -1));
+            } else {
+                ds.createSchema(sft);
+            }
 
             long createTime = System.currentTimeMillis() - startTime;
             logger.info("Created schema in " + createTime + "ms");
@@ -109,6 +117,7 @@ public class TwitterIngest extends Configured implements Tool {
         conf.set(FEATURE, jca.featureName);
         conf.set(SFT, sftString);
         conf.set(EXTENDED_FEATURES, Boolean.valueOf(jca.extendedFeatures).toString());
+        conf.set(PARSE_ONLY, Boolean.valueOf(jca.parseOnly).toString());
 
         // Create the job and set input/output formats and input files
         final Job job = Job.getInstance(getConf());
@@ -127,8 +136,16 @@ public class TwitterIngest extends Configured implements Tool {
         job.setNumReduceTasks(0);
         job.setOutputFormatClass(NullOutputFormat.class);
 
+        final long startTime = System.currentTimeMillis();
         logger.info("Submitting Twitter Ingest Job");
-        return job.waitForCompletion(true) ? 0 : 1;
+        final int res = job.waitForCompletion(true) ? 0 : 1;
+        final long endTime = System.currentTimeMillis();
+
+        final long count = job.getCounters().findCounter(TwitterMapper.COUNTERS.FEATURES_WRITTEN).getValue();
+        final double rate = (double)count / ((double) ((endTime-startTime) / 1000) );
+        logger.info(String.format("Ingest rate: %.2f features/sec", rate));
+
+        return res;
     }
 
     public static class TwitterMapper extends Mapper<LongWritable, Text, NullWritable, NullWritable> {
@@ -136,6 +153,13 @@ public class TwitterIngest extends Configured implements Tool {
         private TwitterParser parser;
         private FeatureWriter<SimpleFeatureType, SimpleFeature> featureWriter;
         boolean debugged = false;
+        boolean parseOnly = false;
+
+        public enum COUNTERS {
+            PARSE_SUCCESS,
+            FEATURES_WRITTEN,
+            PARSE_FAIL
+        }
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -151,7 +175,6 @@ public class TwitterIngest extends Configured implements Tool {
             dataStoreParams.put("user", conf.get(USER));
             dataStoreParams.put("password", conf.get(PASS));
             dataStoreParams.put("tableName", conf.get(CATALOG));
-            dataStoreParams.put("indexSchemaFormat", conf.get(INDEX_SCHEMA_FORMAT));
 
             final DataStore ds;
             try {
@@ -169,29 +192,48 @@ public class TwitterIngest extends Configured implements Tool {
                 throw new IOException("Unable to create feature writer", e);
             }
 
+            parseOnly = Boolean.valueOf(conf.get(PARSE_ONLY));
+            if (parseOnly) logger.info("Running in parse only mode");
+
             logger.info("Mapper Initialization complete");
         }
 
         @Override
         protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-            SimpleFeature parsed = parser.parse(value.toString());
-            if (parsed != null) {
-                context.getCounter("geomesa", "parseSuccess").increment(1);
-                SimpleFeature toWrite = featureWriter.next();
+            if (parseOnly){
+                fakeMap(key, value, context);
+            } else {
+                realMap(key, value, context);
+            }
+        }
 
-                // copy. ugh.
-                toWrite.setAttributes(parsed.getAttributes());
-                ((FeatureIdImpl) toWrite.getIdentifier()).setID(parsed.getID());
-                toWrite.getUserData().putAll(parsed.getUserData());
-
+        protected void realMap(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            final SimpleFeature toWrite = featureWriter.next();
+            final boolean success = parser.parse(value.toString(), toWrite);
+            if (success) {
+                context.getCounter(COUNTERS.PARSE_SUCCESS).increment(1);
                 featureWriter.write();
-                context.getCounter("geomesa", "featuresWritten").increment(1);
+                context.getCounter(COUNTERS.FEATURES_WRITTEN).increment(1);
             } else {
                 if (!debugged) {
                     logger.info("bad: " + value.toString());
                     debugged = true;
                 }
-                context.getCounter("geomesa", "parseFailed").increment(1);
+                context.getCounter(COUNTERS.PARSE_FAIL).increment(1);
+            }
+        }
+
+        protected void fakeMap(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            SimpleFeature sf = parser.parse(value.toString());
+            if (sf != null) {
+                context.getCounter(COUNTERS.PARSE_SUCCESS).increment(1);
+                context.getCounter(COUNTERS.FEATURES_WRITTEN).increment(1);
+            } else {
+                if (!debugged) {
+                    logger.info("bad: " + value.toString());
+                    debugged = true;
+                }
+                context.getCounter(COUNTERS.PARSE_FAIL).increment(1);
             }
         }
 
@@ -202,6 +244,8 @@ public class TwitterIngest extends Configured implements Tool {
 
     // Place holder to tune parameters for ingest later
     public static class TwitterIngestArgs extends Runner.IngestArgs {
+        @Parameter(names= {"--parse-only"}, description = "fake writing data and just parse it...", required = false)
+        public boolean parseOnly = false;
     }
 
     public static void main(String[] args) throws Exception {

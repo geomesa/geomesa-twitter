@@ -68,7 +68,7 @@ object SentiSpark {
     val queryRDD = org.locationtech.geomesa.compute.spark.GeoMesaSpark.rdd(conf, sc, ds, q)
 
     val geofac = new GeometryFactory()
-    val cq = new Query("vacounty", Filter.INCLUDE, Array("COUNTYFP"))
+    val cq = new Query(TwitterArgs.countyFeature, Filter.INCLUDE, Array("COUNTYFP"))
     val countyMap = DataStoreFinder.getDataStore(Map(
       "instanceId" -> TwitterArgs.instance,
       "zookeepers" -> TwitterArgs.zookeepers,
@@ -83,6 +83,8 @@ object SentiSpark {
        }.toSeq.groupBy(_._1)
        .map{ case (c, iter) => (c, iter.map(_._2).reduce(_.union(_))) }
 
+    val terms = TwitterArgs.words.split(',')
+    val outdir = TwitterArgs.outputDir
     val countyAndScore = queryRDD.mapPartitions { iter =>
 //      val ts = new TwitterSentiment()
 //      //val zis = new ZipInputStream(classOf[SentiSpark].getClassLoader.getResourceAsStream("twittwordlist.zip"))
@@ -92,8 +94,6 @@ object SentiSpark {
 //      } finally {
 //        IOUtils.closeQuietly(zis)
 //      }
-
-      val terms = TwitterArgs.words.split(',')
 
       iter.flatMap { sf =>
         import org.locationtech.geomesa.utils.geotools.Conversions._
@@ -122,7 +122,7 @@ object SentiSpark {
         val wkt = new WKTWriter()
         s"$c\t$s\t${wkt.write(g)}"
       }
-      .saveAsTextFile(TwitterArgs.outputDir)
+      .saveAsTextFile(outdir)
   }
 
   object TwitterArgs extends FeatureParams {

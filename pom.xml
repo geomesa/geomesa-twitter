@@ -27,7 +27,7 @@
         <hbc.version>2.2.0</hbc.version>
         <postgresql.jdbc.version>9.1-901-1.jdbc4</postgresql.jdbc.version>
         <!--<geomesa.version>1.0.0-rc.5-SNAPSHOT</geomesa.version>-->
-        <geomesa.version>1.0.0-rc.4</geomesa.version>
+        <geomesa.version>1.0.0-rc.5-SNAPSHOT</geomesa.version>
 
         <!-- logging properties - we expect logging jars to be provided -->
         <!-- 1.7.x is for hadoop 2 and accumulo 1.5.x -->

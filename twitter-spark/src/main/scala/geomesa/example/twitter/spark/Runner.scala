@@ -61,7 +61,7 @@ object Runner {
     // Convert RDD[SimpleFeature] to RDD[(String, SimpleFeature)] where the first
     // element of the tuple is the date to the day resolution
     val dayAndFeature = queryRDD.mapPartitions { iter =>
-      val df = new SimpleDateFormat("yyyyMMdd")
+      val df = new SimpleDateFormat("yyyyMMddTHH")
       val ff = CommonFactoryFinder.getFilterFactory2
       val exp = ff.property("dtg")
       iter.map { f => (df.format(exp.evaluate(f).asInstanceOf[java.util.Date]), f) }

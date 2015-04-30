@@ -20,12 +20,15 @@ import org.locationtech.geomesa.core.data.AccumuloDataStore
 import org.locationtech.geomesa.core.filter._
 import org.locationtech.geomesa.tools.commands.FeatureParams
 import org.locationtech.geomesa.utils.filters.Filters
+import org.opengis.feature.simple.SimpleFeature
 import org.opengis.filter.Filter
 import org.apache.spark.SparkContext._
+import org.locationtech.geomesa.utils.geotools.Conversions._
 
-class SentiSpark
 
-object SentiSpark {
+class CountyAgg
+
+object CountyAgg {
   def main(args: Array[String]): Unit = {
     new JCommander(TwitterArgs, args.toArray: _*)
 
@@ -43,7 +46,7 @@ object SentiSpark {
 
     // Construct a CQL query to filter by bounding box (set bbox based on data we collected)
     val ff = CommonFactoryFinder.getFilterFactory2
-    val pis = classOf[SentiSpark].getClassLoader.getResourceAsStream("va.poly.wkt")
+    val pis = classOf[CountyAgg].getClassLoader.getResourceAsStream("va.poly.wkt")
     val poly =
     try {
       new WKTReader().read(IOUtils.toString(pis))
@@ -67,7 +70,6 @@ object SentiSpark {
     // Create an RDD from a query
     val queryRDD = org.locationtech.geomesa.compute.spark.GeoMesaSpark.rdd(conf, sc, ds, q)
 
-    val geofac = new GeometryFactory()
     val cq = new Query(TwitterArgs.countyFeature, Filter.INCLUDE, Array("COUNTYFP"))
     val countyMap = DataStoreFinder.getDataStore(Map(
       "instanceId" -> TwitterArgs.instance,
@@ -85,31 +87,26 @@ object SentiSpark {
 
     val terms = TwitterArgs.words.split(',')
     val outdir = TwitterArgs.outputDir
-    val countyAndScore = queryRDD.mapPartitions { iter =>
-//      val ts = new TwitterSentiment()
-//      //val zis = new ZipInputStream(classOf[SentiSpark].getClassLoader.getResourceAsStream("twittwordlist.zip"))
-//      val zis = classOf[SentiSpark].getClassLoader.getResourceAsStream("affin.txt")
-//      try {
-//        ts.load(zis)
-//      } finally {
-//        IOUtils.closeQuietly(zis)
-//      }
 
+    def isTrafficRelated(sf: SimpleFeature) = {
+      val text = sf.get[String]("text").toLowerCase
+      terms.find(text.contains).nonEmpty
+    }
+
+    def getCounty(sf: SimpleFeature): Option[String] = {
+      countyMap.find{ case (c, g) => g.contains(sf.point) }.map{ case (c, g) => c}
+    }
+
+
+    val countyAndTweet = queryRDD.mapPartitions { iter =>
       iter.flatMap { sf =>
-        import org.locationtech.geomesa.utils.geotools.Conversions._
-        val text = sf.get[String]("text").toLowerCase
-
-        if (terms.find(text.contains).nonEmpty) {
-          val words = text.split("\\W").map(_.trim).toList
-//          val score = ts.classify(words)
-          countyMap.find( _._2.contains(sf.point)).map{ case (c, geom) => (c, true) }
-        } else {
-          countyMap.find( _._2.contains(sf.point)).map{ case (c, geom) => (c, false) }
+        getCounty(sf).map { county =>
+          (county, isTrafficRelated(sf))
         }
       }
     }
 
-    countyAndScore
+    countyAndTweet
       .groupBy(_._1)
       .map { case (c, iter) =>
         val s = iter.toSeq

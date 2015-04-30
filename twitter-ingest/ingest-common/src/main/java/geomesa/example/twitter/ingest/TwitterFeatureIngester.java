@@ -75,8 +75,8 @@ public class TwitterFeatureIngester {
     static {
         final String[] features = {
                 FEAT_TWEET_ID + ":" + "String",
-                FEAT_USER_NAME + ":" + "String",
-                FEAT_USER_ID + ":" + "String",
+                FEAT_USER_NAME + ":" + "String:index=true",
+                FEAT_USER_ID + ":" + "String:index=true",
                 FEAT_TEXT + ":" + "String",
                 FEAT_DTG + ":" + "Date",
                 FEAT_GEOM + ":" + "Point:srid=4326"

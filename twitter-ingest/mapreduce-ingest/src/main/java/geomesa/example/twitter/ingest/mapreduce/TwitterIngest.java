@@ -73,19 +73,6 @@ public class TwitterIngest extends Configured implements Tool {
         final String augmented = sftString + ";table.splitter.class=org.locationtech.geomesa.core.data.DigitSplitter,table.splitter.options=fmt:%01d,min:0,max:9";
         final SimpleFeatureType sft = SimpleFeatureTypes.createType(jca.featureName, sftString);
 
-//        String schema = new IndexSchemaBuilder("~")
-//                .randomNumber(Integer.parseInt(jca.shards))
-////                .indexOrDataFlag()
-//                .constant(sft.getTypeName())
-//                .geoHash(0, 2)
-//                .date("yyyyMMdd")
-//                .nextPart()
-//                .geoHash(2, 5)
-//                .nextPart()
-//                .id()
-//                .build();
-//        sft.getUserData().put("geomesa_index_schema", schema);
-
         // Create the datastore
         final Map<String, Object> dataStoreParams = new HashMap<>();
         dataStoreParams.put("instanceId", jca.instanceId);
@@ -122,59 +109,6 @@ public class TwitterIngest extends Configured implements Tool {
         } else {
             logger.info("Geomesa tables exist...continuing with mapreduce job");
         }
-
-        // add extra splits
-//        final SortedSet<Text> attrSplits = new TreeSet<>();
-//        for (char c = 'a'; c <= 'z'; c++) {
-//            attrSplits.add(new Text(sft.getTypeName() + "~" + TwitterFeatureIngester.FEAT_USER_NAME + "\u0000" + Character.toString(c)));
-//            attrSplits.add(new Text(sft.getTypeName() + "~" + TwitterFeatureIngester.FEAT_USER_NAME + "\u0000" + Character.toString(c) + "m"));
-//        }
-//        for (char c = 'A'; c <= 'Z'; c++) {
-//            attrSplits.add(new Text(sft.getTypeName() + "~" + TwitterFeatureIngester.FEAT_USER_NAME + "\u0000" + Character.toString(c)));
-//            attrSplits.add(new Text(sft.getTypeName() + "~" + TwitterFeatureIngester.FEAT_USER_NAME + "\u0000" + Character.toString(c) + "m"));
-//        }
-//        for (int i = 0; i < 10; i ++) {
-//            attrSplits.add(new Text(sft.getTypeName() + "~" + TwitterFeatureIngester.FEAT_USER_ID + "\u0000" + Integer.toString(i)));
-//            attrSplits.add(new Text(sft.getTypeName() + "~" + TwitterFeatureIngester.FEAT_USER_ID + "\u0000" + Integer.toString(i) + Integer.toString(2)));
-//            attrSplits.add(new Text(sft.getTypeName() + "~" + TwitterFeatureIngester.FEAT_USER_ID + "\u0000" + Integer.toString(i) + Integer.toString(4)));
-//            attrSplits.add(new Text(sft.getTypeName() + "~" + TwitterFeatureIngester.FEAT_USER_ID + "\u0000" + Integer.toString(i) + Integer.toString(6)));
-//            attrSplits.add(new Text(sft.getTypeName() + "~" + TwitterFeatureIngester.FEAT_USER_ID + "\u0000" + Integer.toString(i) + Integer.toString(8)));
-//        }
-//        ds.connector().tableOperations().addSplits(ds.getAttrIdxTableName(sft), attrSplits);
-//        logger.info("added additional splits to attribute table");
-
-        // add extra hex splits to the record table
-//        final SortedSet<Text> recordSplits = new TreeSet<>();
-//        for (char c = 'a'; c <= 'f'; c++) {
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Character.toString(c) + "2"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Character.toString(c) + "4"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Character.toString(c) + "6"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Character.toString(c) + "8"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Character.toString(c) + "a"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Character.toString(c) + "c"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Character.toString(c) + "e"));
-//        }
-//        for (int i = 0; i < 10; i ++) {
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Integer.toString(i) + "2"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Integer.toString(i) + "4"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Integer.toString(i) + "6"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Integer.toString(i) + "8"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Integer.toString(i) + "a"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Integer.toString(i) + "c"));
-//            recordSplits.add(new Text(sft.getTypeName() + "~" + Integer.toString(i) + "e"));
-//        }
-//        ds.connector().tableOperations().addSplits(ds.getRecordTableForType(sft), recordSplits);
-//        logger.info("added custom record splits");
-
-        // add extra hex splits to the st table
-//        final SortedSet<Text> stSplits = new TreeSet<>();
-//        final String ms = Integer.toString(ds.getSpatioTemporalMaxShard(sft));
-//        final String fmt = "%0" + ms.length() + "d";
-//        for (int i = 0; i < ds.getSpatioTemporalMaxShard(sft); i++) {
-//            stSplits.add(new Text(String.format(fmt, i) + "~1"));
-//        }
-//        ds.connector().tableOperations().addSplits(ds.getSpatioTemporalIdxTableName(sft), stSplits);
-//        logger.info("added custom ST splits");
 
         // Set up the info needed in the mappers
         final Configuration conf = getConf();

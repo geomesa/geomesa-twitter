@@ -79,18 +79,20 @@ public class Runner {
         log.info("Ingest completed");
     }
 
-    public static class IngestArgs extends GeomesaArgs {
+    public static class IngestArgs extends GeoMesaFeatureArgs {
         @Parameter(description = "files", required = true)
         public List<String> files = new ArrayList<>();
-
-        @Parameter(names= {"--featureName", "-f"}, description = "featureName to assign to the data", required = true)
-        public String featureName;
 
         @Parameter(names= {"--useExtendedFeatures", "-e"}, description = "parse extended features or the minimal set", required = false)
         public String extendedFeatures;
 
         @Parameter(names= {"--shards", "-s"}, description = "number of shards to use for data", required = false)
         public String shards;
+    }
+
+    public static class GeoMesaFeatureArgs extends GeomesaArgs {
+        @Parameter(names= {"--featureName", "-f"}, description = "featureName to assign to the data", required = true)
+        public String featureName;
     }
 
     public static class GeomesaArgs{

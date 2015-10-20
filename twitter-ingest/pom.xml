@@ -16,15 +16,7 @@
     <modules>
         <module>ingest-common</module>
         <module>mapreduce-ingest</module>
+        <module>storm-ingest</module>
     </modules>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>geomesa.example.ingest</groupId>
-                <artifactId>twitter-ingest-common</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 </project>

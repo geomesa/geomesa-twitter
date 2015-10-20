@@ -18,7 +18,7 @@
     <properties>
         <!-- environment-dependent versions -->
         <scala.version>2.10.5</scala.version>
-        <zookeeper.version>3.3.6</zookeeper.version>
+        <zookeeper.version>3.4.5</zookeeper.version>
         <accumulo.version>1.6.2</accumulo.version>
         <hadoop.version>2.2.0</hadoop.version>
         <gt.version>11.2</gt.version>
@@ -38,6 +38,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>geomesa.example.ingest</groupId>
+                <artifactId>twitter-ingest-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.scala-lang</groupId>
                 <artifactId>scala-library</artifactId>
@@ -115,7 +120,7 @@
             <dependency>
                 <groupId>com.beust</groupId>
                 <artifactId>jcommander</artifactId>
-                <version>1.30</version>
+                <version>1.32</version>
             </dependency>
 
             <dependency>
@@ -204,18 +209,11 @@
                 <groupId>org.apache.zookeeper</groupId>
                 <artifactId>zookeeper</artifactId>
                 <version>${zookeeper.version}</version>
+                <scope>provided</scope>
                 <exclusions>
                     <exclusion>
-                        <groupId>javax.jms</groupId>
-                        <artifactId>jms</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.sun.jmx</groupId>
-                        <artifactId>jmxri</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.sun.jdmk</groupId>
-                        <artifactId>jmxtools</artifactId>
+                        <groupId>*</groupId>
+                        <artifactId>*</artifactId>
                     </exclusion>
                 </exclusions>
             </dependency>

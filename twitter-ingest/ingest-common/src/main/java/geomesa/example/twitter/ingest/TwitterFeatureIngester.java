@@ -16,24 +16,20 @@
 
 package geomesa.example.twitter.ingest;
 
-import com.google.common.base.Joiner;
 import org.apache.log4j.Logger;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
-import org.geotools.data.DataUtilities;
 import org.geotools.data.FeatureStore;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.feature.DefaultFeatureCollection;
-import org.geotools.feature.SchemaException;
-import org.locationtech.geomesa.utils.geotools.SimpleFeatureTypes;
-import org.opengis.feature.simple.SimpleFeature;
+import org.locationtech.geomesa.accumulo.data.tables.AvailableTables;
+import org.locationtech.geomesa.accumulo.util.SftBuilder;
 import org.opengis.feature.simple.SimpleFeatureType;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -68,62 +64,44 @@ public class TwitterFeatureIngester {
     public static final String FEAT_WITHHELD_SCOPE = "withheld_scope";
     public static final String FEAT_LANGUAGE = "lang";
 
-    public static final String FEATURE_SPEC;
-    public static final String EXTENDED_FEATURE_SPEC;
-    public static final String SPEC3;
+    public static SimpleFeatureType buildBasic(String name) {
+        return new SftBuilder()
+                .stringType(FEAT_TWEET_ID, false)
+                .stringType(FEAT_USER_NAME, true)
+                .stringType(FEAT_USER_ID, true)
+                .stringType(FEAT_TEXT, false)
+                .date(FEAT_DTG, true)
+                .point(FEAT_GEOM, true)
+                .withIndexes(AvailableTables.Z3TableSchemeStr())
+                .build(name);
+    }
 
-    static {
-        final String[] features = {
-                FEAT_TWEET_ID + ":" + "String",
-                FEAT_USER_NAME + ":" + "String:index=true",
-                FEAT_USER_ID + ":" + "String:index=true",
-                FEAT_TEXT + ":" + "String",
-                FEAT_DTG + ":" + "Date",
-                FEAT_GEOM + ":" + "Point:srid=4326"
-        };
-        FEATURE_SPEC = Joiner.on(",").join(features);
-
-        final String[] extendedFeatures = {
-                FEATURE_SPEC,
-                FEAT_IN_REPLY_TO_USER_ID + ":" + "java.lang.Long",
-                FEAT_IN_REPLY_TO_USER_NAME + ":" + "String",
-                FEAT_IN_REPLY_TO_STATUS + ":" + "String",
-                FEAT_HASHTAGS + ":" + "String",
-                FEAT_USER_MENTIONS + ":" + "String",
-                FEAT_URLS + ":" + "String",
-                FEAT_SYMBOLS + ":" + "String",
-                FEAT_MEDIA + ":" + "String",
-                FEAT_RETWEETS + ":" + "java.lang.Long",
-                FEAT_IS_RETWEET + ":" + "String",
-                FEAT_SOURCE + ":" + "String",
-                FEAT_FILTER_LEVEL + ":" + "String",
-                FEAT_WITHHELD_COPYRIGHT + ":" + "String",
-                FEAT_WITHHELD_COUNTRIES + ":" + "String",
-                FEAT_WITHHELD_SCOPE + ":" + "String",
-                FEAT_LANGUAGE + ":" + "String"
-        };
-        EXTENDED_FEATURE_SPEC = Joiner.on(",").join(extendedFeatures);
-
-        final String[] spec3features = {
-                FEATURE_SPEC,
-                FEAT_IN_REPLY_TO_USER_ID + ":" + "java.lang.Long",
-                FEAT_IN_REPLY_TO_USER_NAME + ":" + "String",
-                FEAT_IN_REPLY_TO_STATUS + ":" + "String",
-                FEAT_HASHTAGS + ":" + "List[String]",
-                FEAT_USER_MENTIONS + ":" + "String",
-                FEAT_URLS + ":" + "String",
-                FEAT_SYMBOLS + ":" + "String",
-                FEAT_MEDIA + ":" + "String",
-                FEAT_RETWEETS + ":" + "java.lang.Long",
-                FEAT_IS_RETWEET + ":" + "String",
-                FEAT_SOURCE + ":" + "String",
-                FEAT_FILTER_LEVEL + ":" + "String",
-                FEAT_WITHHELD_COPYRIGHT + ":" + "String",
-                FEAT_WITHHELD_COUNTRIES + ":" + "String",
-                FEAT_WITHHELD_SCOPE + ":" + "String",
-                FEAT_LANGUAGE + ":" + "String"
-        };
-        SPEC3 = Joiner.on(",").join(spec3features);
+    public static SimpleFeatureType buildExtended(String name) {
+        return new SftBuilder()
+                .stringType(FEAT_TWEET_ID, false)
+                .stringType(FEAT_USER_NAME, true)
+                .stringType(FEAT_USER_ID, true)
+                .stringType(FEAT_TEXT, false)
+                .date(FEAT_DTG, true)
+                .point(FEAT_GEOM, true)
+                .longType(FEAT_IN_REPLY_TO_USER_ID, false)
+                .stringType(FEAT_IN_REPLY_TO_USER_NAME, false)
+                .stringType(FEAT_IN_REPLY_TO_STATUS, false)
+                .stringType(FEAT_HASHTAGS, false)
+                .stringType(FEAT_USER_MENTIONS, false)
+                .stringType(FEAT_URLS, false)
+                .stringType(FEAT_SYMBOLS, false)
+                .stringType(FEAT_MEDIA, false)
+                .longType(FEAT_RETWEETS, false)
+                .stringType(FEAT_IS_RETWEET, false)
+                .stringType(FEAT_SOURCE, false)
+                .stringType(FEAT_FILTER_LEVEL, false)
+                .stringType(FEAT_WITHHELD_COPYRIGHT, false)
+                .stringType(FEAT_WITHHELD_COUNTRIES, false)
+                .stringType(FEAT_WITHHELD_SCOPE, false)
+                .stringType(FEAT_LANGUAGE, false)
+                .withIndexes(AvailableTables.Z3TableSchemeStr())
+                .build(name);
     }
 
     final SimpleFeatureType twitterType;
@@ -139,10 +117,7 @@ public class TwitterFeatureIngester {
     }
 
     public TwitterFeatureIngester(String featureName, boolean useExtendedFeatures) {
-        final SimpleFeatureType twitterType;
-        twitterType = SimpleFeatureTypes.createType(featureName, useExtendedFeatures ? EXTENDED_FEATURE_SPEC : FEATURE_SPEC);
-        twitterType.getUserData().put("geomesa_index_start_time", FEAT_DTG);
-        this.twitterType = twitterType;
+        this.twitterType = useExtendedFeatures ? buildExtended(featureName) : buildBasic(featureName);
         this.featureName = featureName;
         this.useExtendedFeatures = useExtendedFeatures;
     }

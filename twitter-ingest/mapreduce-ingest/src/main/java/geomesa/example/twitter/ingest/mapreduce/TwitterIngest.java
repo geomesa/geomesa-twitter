@@ -65,10 +65,9 @@ public class TwitterIngest extends Configured implements Tool {
         }
 
         // Test the sft to make sure it works
-        final String sftString = Boolean.valueOf(jca.extendedFeatures)
-                ? TwitterFeatureIngester.EXTENDED_FEATURE_SPEC : TwitterFeatureIngester.FEATURE_SPEC;
-        final String augmented = sftString + ";table.splitter.class=org.locationtech.geomesa.core.data.DigitSplitter,table.splitter.options=fmt:%01d,min:0,max:9";
-        final SimpleFeatureType sft = SimpleFeatureTypes.createType(jca.featureName, sftString);
+        final SimpleFeatureType sft = Boolean.valueOf(jca.extendedFeatures)
+                ? TwitterFeatureIngester.buildExtended(jca.featureName)
+                : TwitterFeatureIngester.buildBasic(jca.featureName);
 
         // Create the datastore
         final Map<String, Object> dataStoreParams = new HashMap<>();
@@ -115,7 +114,7 @@ public class TwitterIngest extends Configured implements Tool {
         conf.set(INSTANCE, jca.instanceId);
         conf.set(ZOOKEEPERS, jca.zookeepers);
         conf.set(FEATURE, jca.featureName);
-        conf.set(SFT, sftString);
+        conf.set(SFT, SimpleFeatureTypes.encodeType(sft));
         conf.set(EXTENDED_FEATURES, Boolean.valueOf(jca.extendedFeatures).toString());
         conf.set(PARSE_ONLY, Boolean.valueOf(jca.parseOnly).toString());
 

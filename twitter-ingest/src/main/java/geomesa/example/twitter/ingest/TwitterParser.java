@@ -31,17 +31,17 @@ import org.geotools.feature.DefaultFeatureCollection;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-import org.locationtech.geomesa.feature.AvroSimpleFeatureFactory;
+import org.locationtech.geomesa.features.avro.AvroSimpleFeatureFactory;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
-
-import static geomesa.example.twitter.ingest.TwitterFeatureIngester.*;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+
+import static geomesa.example.twitter.ingest.TwitterFeatureIngester.*;
 
 /**
  * Class to parse twitter data from an input stream that has one tweet as json per line

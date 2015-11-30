@@ -1,13 +1,20 @@
 package geomesa.example.twitter.storm
 
+import java.util
+import java.util.UUID
+
+import backtype.storm.spout.SchemeAsMultiScheme
 import backtype.storm.topology.TopologyBuilder
 import backtype.storm.{Config, StormSubmitter}
 import com.beust.jcommander.{JCommander, Parameter, ParameterException}
 import com.typesafe.scalalogging.slf4j.Logging
 import geomesa.example.twitter.ingest.{Runner, TwitterFeatureIngester}
 import geomesa.example.twitter.storm.TwitterStormIngest.StormArgs
+import org.apache.accumulo.core.conf.Property
 import org.geotools.data.DataStoreFinder
-import storm.kafka.{KafkaSpout, SpoutConfig, ZkHosts}
+import org.locationtech.geomesa.accumulo.data.AccumuloDataStore
+import org.locationtech.geomesa.accumulo.data.tables.Z3Table
+import storm.kafka.{StringScheme, KafkaSpout, SpoutConfig, ZkHosts}
 
 import scala.collection.JavaConversions._
 
@@ -22,29 +29,36 @@ class TwitterStormIngest(args: StormArgs) extends Logging {
       "tableName" -> args.catalog
     )
 
-    val ds = DataStoreFinder.getDataStore(params)
+    val ds = DataStoreFinder.getDataStore(params).asInstanceOf[AccumuloDataStore]
     val sft = TwitterFeatureIngester.buildExtended(args.featureName)
     ds.createSchema(sft)
 
+    val table = Z3Table.formatTableName(args.catalog, sft)
+    val tableOps = ds.connector.tableOperations
+    tableOps.setProperty(table, Property.TABLE_SPLIT_THRESHOLD.getKey, "1G")
+    tableOps.setProperty(table, Property.TABLE_SPLIT_THRESHOLD.getKey, "1G")
+    tableOps.setProperty(table, Property.TABLE_BLOCKCACHE_ENABLED.getKey, "true")
+
     val builder = new TopologyBuilder
-    val spoutConfig = new SpoutConfig(new ZkHosts(args.brokers), args.topic, "/twitter-kafka-spout", "storm-consumer")
-    builder.setSpout("k", new KafkaSpout(spoutConfig), 1)
-    builder.setBolt("g", new GeoMesaIngestBolt(), 10).localOrShuffleGrouping("k")
+    val spoutConfig = new SpoutConfig(new ZkHosts(args.zookeepers), args.topic, s"/${args.topic}", UUID.randomUUID().toString)
+    spoutConfig.scheme = new SchemeAsMultiScheme(new StringScheme())
+    spoutConfig.startOffsetTime = kafka.api.OffsetRequest.EarliestTime
+    spoutConfig.forceFromStart = true
+    builder.setSpout("kafka", new KafkaSpout(spoutConfig), args.numSpouts)
+    builder.setBolt("geomesa", new GeoMesaIngestBolt(), args.numBolts).localOrShuffleGrouping("kafka")
+//    builder.setSpout("hdfs", new HdfsSpout)
+//    builder.setBolt("geomesa", new GeoMesaIngestBolt(), args.numBolts).localOrShuffleGrouping("hdfs")
 
     val conf = new Config()
     conf.setDebug(true)
-    conf.setNumWorkers(10)
-    conf.setMaxSpoutPending(1000)
-    conf.setNumAckers(2)
-    conf.setMaxTaskParallelism(20)
-    conf.put(Config.TOPOLOGY_EXECUTOR_RECEIVE_BUFFER_SIZE, 16384: Integer)
-    conf.put(Config.TOPOLOGY_EXECUTOR_SEND_BUFFER_SIZE, 16384: Integer)
-    conf.put(Config.TOPOLOGY_RECEIVER_BUFFER_SIZE, 8: Integer)
-    conf.put(Config.TOPOLOGY_TRANSFER_BUFFER_SIZE, 32: Integer)
-    conf.put(Config.TOPOLOGY_STATS_SAMPLE_RATE, 0.05: java.lang.Double)
+    conf.setNumWorkers(args.numBolts + args.numSpouts)
+    conf.setMaxSpoutPending(1000000)
+    conf.setNumAckers(20)
+    conf.setMaxTaskParallelism(40)
     params.foreach { case (k,v) => conf.put(s"${TwitterStormIngest.base}.$k", v.asInstanceOf[String]) }
 
     conf.put(TwitterStormIngest.FeatureName, args.featureName)
+    conf.put(TwitterStormIngest.SkipIngest, args.skipIngest.toString)
 
     logger.info("Submitting topology")
     StormSubmitter.submitTopology("twitter", conf, builder.createTopology())
@@ -61,6 +75,7 @@ object TwitterStormIngest extends Logging {
   val TableName = s"$base.tableName"
   val KafkaBrokers = s"$base.kafkaBrokers"
   val FeatureName   = s"$base.featureName"
+  val SkipIngest    = s"$base.skipIngest"
 
   class StormArgs extends Runner.GeoMesaFeatureArgs {
     @Parameter(names = Array("--brokers", "-b"), description = "Kafka brokers", required = true)
@@ -68,6 +83,15 @@ object TwitterStormIngest extends Logging {
 
     @Parameter(names = Array("--topic", "-t"), description = "Kafka brokers", required = true)
     var topic: String = null
+
+    @Parameter(names = Array("--bolts"), description = "number of bolts", required = true)
+    var numBolts: Integer = 10
+
+    @Parameter(names = Array("--spouts"), description = "number of spouts", required = true)
+    var numSpouts: Integer = 5
+
+    @Parameter(names = Array("--skip-ingest"), description = "skip ingest", required = true)
+    var skipIngest: String = "false"
   }
 
   def main(args: Array[String]): Unit = {
@@ -78,10 +102,9 @@ object TwitterStormIngest extends Logging {
       new TwitterStormIngest(clArgs).run()
     }
     catch {
-      case e: ParameterException => {
+      case e: ParameterException =>
         logger.info("Error parsing arguments: " + e.getMessage, e)
         System.exit(-1)
-      }
     }
   }
 

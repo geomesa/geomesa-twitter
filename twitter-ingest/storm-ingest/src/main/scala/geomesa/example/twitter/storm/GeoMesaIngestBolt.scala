@@ -7,8 +7,11 @@ import backtype.storm.topology.OutputFieldsDeclarer
 import backtype.storm.topology.base.BaseRichBolt
 import backtype.storm.tuple.Tuple
 import geomesa.example.twitter.ingest.{TwitterFeatureIngester, TwitterParser}
+import org.apache.accumulo.core.conf.Property
 import org.geotools.data.{Transaction, DataStoreFinder}
+import org.locationtech.geomesa.accumulo.GeomesaSystemProperties
 import org.locationtech.geomesa.accumulo.data._
+import org.locationtech.geomesa.accumulo.data.tables.Z3Table
 
 import scala.collection.JavaConversions._
 
@@ -17,12 +20,17 @@ class GeoMesaIngestBolt extends BaseRichBolt {
   private var ds: AccumuloDataStore = null
   private var parser: TwitterParser = null
   private var sfw: SFFeatureWriter = null
+  private var outputCollector: OutputCollector = null
+  private var skipIngest: Boolean = false
 
   override def execute(tuple: Tuple): Unit = {
-    val jsonMsg = tuple.getStringByField("message")
-    val next = sfw.next()
-    parser.parse(jsonMsg, next)
-    sfw.write()
+    outputCollector.ack(tuple)
+    val jsonMsg = tuple.getStringByField("str")
+    if (! skipIngest) {
+      val next = sfw.next()
+      parser.parse(jsonMsg, next)
+      sfw.write()
+    }
   }
 
   override def prepare(map: util.Map[_, _], topologyContext: TopologyContext, outputCollector: OutputCollector): Unit = {
@@ -38,6 +46,12 @@ class GeoMesaIngestBolt extends BaseRichBolt {
     sfw = ds.getFeatureWriterAppend(featureName, Transaction.AUTO_COMMIT)
     val sft = TwitterFeatureIngester.buildExtended(featureName)
     parser = new TwitterParser(featureName, sft, true)
+    this.outputCollector = outputCollector
+    this.skipIngest = map.get(TwitterStormIngest.SkipIngest).asInstanceOf[String].toBoolean
+
+    GeomesaSystemProperties.BatchWriterProperties.WRITER_MEMORY_BYTES.set((1024l*1024*10).toString)
+    GeomesaSystemProperties.BatchWriterProperties.WRITER_THREADS.set(20.toString)
+    GeomesaSystemProperties.BatchWriterProperties.WRITER_LATENCY_MILLIS.set((1000l*120).toString)
   }
 
   override def declareOutputFields(outputFieldsDeclarer: OutputFieldsDeclarer): Unit = {
@@ -49,5 +63,6 @@ class GeoMesaIngestBolt extends BaseRichBolt {
     ds = null
     sfw = null
     parser = null
+    outputCollector = null
   }
 }

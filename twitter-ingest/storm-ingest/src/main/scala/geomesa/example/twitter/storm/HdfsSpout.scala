@@ -50,9 +50,8 @@ class HdfsSpout extends IRichSpout {
   }
 
   override def activate(): Unit = {
-    fileList = IOUtils.readLines(getClass.getClassLoader.getResourceAsStream("files"))
+    fileList = IOUtils.readLines(getClass.getClassLoader.getResourceAsStream("twitter_files"))
     pos = 0
-
   }
 
   override def deactivate(): Unit = {}

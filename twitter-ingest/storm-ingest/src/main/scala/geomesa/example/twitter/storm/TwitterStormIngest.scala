@@ -1,6 +1,5 @@
 package geomesa.example.twitter.storm
 
-import java.util
 import java.util.UUID
 
 import backtype.storm.spout.SchemeAsMultiScheme
@@ -14,7 +13,7 @@ import org.apache.accumulo.core.conf.Property
 import org.geotools.data.DataStoreFinder
 import org.locationtech.geomesa.accumulo.data.AccumuloDataStore
 import org.locationtech.geomesa.accumulo.data.tables.Z3Table
-import storm.kafka.{StringScheme, KafkaSpout, SpoutConfig, ZkHosts}
+import storm.kafka.{KafkaSpout, SpoutConfig, StringScheme, ZkHosts}
 
 import scala.collection.JavaConversions._
 

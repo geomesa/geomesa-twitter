@@ -20,7 +20,7 @@ import java.text.SimpleDateFormat
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.{SparkConf, SparkContext}
-import org.geotools.data.{Query, DataStoreFinder}
+import org.geotools.data.{DataStoreFinder, Query}
 import org.geotools.factory.CommonFactoryFinder
 import org.locationtech.geomesa.accumulo.data.AccumuloDataStore
 import org.locationtech.geomesa.compute.spark.GeoMesaSpark
@@ -28,7 +28,7 @@ import org.locationtech.geomesa.compute.spark.GeoMesaSpark
 object Runner {
   def main(args: Array[String]) {
 
-    if(args.size != 1) {
+    if (args.length != 1) {
       println("1 arg: feature name")
     }
     val feature = args(0)
@@ -37,11 +37,11 @@ object Runner {
 
     // Get a handle to the data store
     val params = Map(
-      "instanceId" -> "dcloud",
-      "zookeepers" -> "dzoo1,dzoo2,dzoo3",
-      "user"       -> "root",
-      "password"   -> "secret",
-      "tableName"  -> "twitter_rc5")
+      "instanceId" -> "myinstance",
+      "zookeepers" -> "zoo1,zoo2,zoo3",
+      "user"       -> "user",
+      "password"   -> "password",
+      "tableName"  -> "geomesa_catalog")
 
     val ds = DataStoreFinder.getDataStore(params).asInstanceOf[AccumuloDataStore]
 
@@ -56,7 +56,7 @@ object Runner {
     val sc = new SparkContext(sconf)
 
     // Create an RDD from a query
-    val queryRDD = org.locationtech.geomesa.compute.spark.GeoMesaSpark.rdd(conf, sc, params, q)
+    val queryRDD = org.locationtech.geomesa.compute.spark.GeoMesaSpark.rdd(conf, sc, params, q, None)
 
     // Convert RDD[SimpleFeature] to RDD[(String, SimpleFeature)] where the first
     // element of the tuple is the date to the day resolution
@@ -74,6 +74,6 @@ object Runner {
     val countByDay = groupedByDay.map { case (date, iter) => (date, iter.size) }
 
     // Collect the results and print
-    countByDay.collect.foreach(println)
+    countByDay.collect().foreach(println)
   }
 }

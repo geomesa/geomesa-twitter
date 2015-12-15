@@ -12,7 +12,7 @@ import org.locationtech.geomesa.compute.spark.GeoMesaSpark
 import org.locationtech.geomesa.tools.commands.FeatureParams
 import org.opengis.feature.simple.SimpleFeature
 
-object FraudDetector {
+object StalkerFinder {
   def main(args: Array[String]): Unit = {
     new JCommander(Args, args.toArray: _*)
 
@@ -39,7 +39,7 @@ object FraudDetector {
     val queryRDD = org.locationtech.geomesa.compute.spark.GeoMesaSpark.rdd(conf, sc, params, q)
 
     def geoHash(sf: SimpleFeature) = {
-      org.locationtech.geomesa.utils.geohash.GeoHash.apply(sf.geometry.getCentroid, 25)
+      org.locationtech.geomesa.utils.geohash.GeoHash.apply(sf.geometry.getCentroid, Args.ghBits)
     }
 
     val userAndGeoHash = queryRDD.mapPartitions { iter =>
@@ -52,22 +52,23 @@ object FraudDetector {
       }
     }
 
-    val paired = userAndGeoHash
+    // create pairs of ( (user1, user2), (day, geohash) ) for when users are in the
+    // same place at the same time
+    val sameDaySameTimePairs = userAndGeoHash
       .groupBy { case (u, d, g)  => (d, g) }
       .flatMap { case ( (d, g), iter) =>
-        val peeps = iter.map(_._1)
-        val combine =
-          for {
-              x <- peeps
-              y <- peeps
-          } yield (x, y)
-        combine.map{ case (x, y) => ( (x, y), (d, g))}
+        val users = iter.map { case (user, day, geohash) => user }.toSet  //need a set bc of mutiple observations...
+        val pairs = users.toStream.combinations(2).map{ case seq => (seq(0), seq(1))}   //convert back to 2 tuple
+        pairs.map{ case (x:String, y: String) => ( (x, y), (d, g))}
       }
 
-    paired
+    // group by day/time,
+    // filter by min number of times 2 users were in the same place at the same time,
+    // and print
+    sameDaySameTimePairs
      .groupBy(_._1)
      .filter(_._2.size > Args.minCount)
-     .map { case ((x, y), iter) => s"($x, y)" + "\t" + iter.map{ case ((_, _), (u, g)) => s"($u, $g)"}.mkString(", ") }
+     .map { case ((x, y), iter) => s"($x, $y)" + "\t" + iter.map{ case ((_, _), (u, g)) => s"($u, $g)"}.mkString(", ") }
      .foreach(println)
 
   }
@@ -78,6 +79,9 @@ object FraudDetector {
 
     @Parameter(names = Array("--min-count"), description = "min num counts", required = true)
     var minCount: Integer = 0
+
+    @Parameter(names = Array("--geo-hash-bits"), description = "geo hash bits (try 25?)", required = true)
+    var ghBits: Integer = 25
   }
 
 }

@@ -24,7 +24,7 @@ import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.feature.DefaultFeatureCollection;
 import org.locationtech.geomesa.accumulo.data.tables.AvailableTables;
-import org.locationtech.geomesa.accumulo.util.SftBuilder;
+import org.locationtech.geomesa.utils.geotools.SftBuilder;
 import org.opengis.feature.simple.SimpleFeatureType;
 
 import java.io.File;

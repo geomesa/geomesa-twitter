@@ -13,8 +13,8 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <kafka.version>0.8.2.1</kafka.version>
-        <storm.version>0.9.5</storm.version>
+        <kafka.version>0.8.2.2</kafka.version>
+        <storm.version>0.9.6</storm.version>
     </properties>
 
     <dependencies>

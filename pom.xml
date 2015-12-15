@@ -18,7 +18,7 @@
     <properties>
         <!-- environment-dependent versions -->
         <scala.version>2.10.5</scala.version>
-        <zookeeper.version>3.3.6</zookeeper.version>
+        <zookeeper.version>3.4.5</zookeeper.version>
         <accumulo.version>1.6.2</accumulo.version>
         <hadoop.version>2.2.0</hadoop.version>
         <gt.version>11.2</gt.version>

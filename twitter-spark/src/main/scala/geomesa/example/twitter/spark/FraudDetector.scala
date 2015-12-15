@@ -42,8 +42,8 @@ object FraudDetector {
       org.locationtech.geomesa.utils.geohash.GeoHash.apply(sf.geometry.getCentroid, 25)
     }
 
-    val dtf = ISODateTimeFormat.basicDate()
     val userAndGeoHash = queryRDD.mapPartitions { iter =>
+      val dtf = ISODateTimeFormat.basicDate()
       iter.map { sf =>
         val gh = geoHash(sf)
         val user = sf.get[String]("user_name")
@@ -52,13 +52,32 @@ object FraudDetector {
       }
     }
 
-    // TODO find people who are interesting...
+    val paired = userAndGeoHash
+      .groupBy { case (u, d, g)  => (d, g) }
+      .flatMap { case ( (d, g), iter) =>
+        val peeps = iter.map(_._1)
+        val combine =
+          for {
+              x <- peeps
+              y <- peeps
+          } yield (x, y)
+        combine.map{ case (x, y) => ( (x, y), (d, g))}
+      }
+
+    paired
+     .groupBy(_._1)
+     .filter(_._2.size > Args.minCount)
+     .map { case ((x, y), iter) => s"($x, y)" + "\t" + iter.map{ case ((_, _), (u, g)) => s"($u, $g)"}.mkString(", ") }
+     .foreach(println)
 
   }
 
-    object Args extends FeatureParams {
+  object Args extends FeatureParams {
     @Parameter(names = Array("--output-dir"), description = "hdfs output dir for tsv", required = true)
     var outputDir: String = null
+
+    @Parameter(names = Array("--min-count"), description = "min num counts", required = true)
+    var minCount: Integer = 0
   }
 
 }
